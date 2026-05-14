@@ -37,6 +37,7 @@ export const appClient = {
     invoke("app_close_to_tray_on_close_set", { enabled }),
 
   openInBrowser: (url: string) => invoke("open_in_browser", { url }),
+  openExternalUrl: (url: string) => invoke("open_external_url", { url }),
   openInFileManager: (path: string) => invoke("open_in_file_manager", { path }),
   showMainWindow: () => invoke("app_show_main_window"),
   openUpdateLogsDir: (assetPath?: string) =>

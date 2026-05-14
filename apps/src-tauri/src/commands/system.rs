@@ -1,6 +1,8 @@
 use crate::{
     app_shell::{set_unsaved_settings_draft_sections, show_main_window},
-    commands::shared::{open_in_browser_blocking, open_in_file_manager_blocking},
+    commands::shared::{
+        open_external_url_blocking, open_in_browser_blocking, open_in_file_manager_blocking,
+    },
 };
 
 /// 函数 `open_in_browser`
@@ -19,6 +21,13 @@ pub async fn open_in_browser(url: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || open_in_browser_blocking(&url))
         .await
         .map_err(|err| format!("open_in_browser task failed: {err}"))?
+}
+
+#[tauri::command]
+pub async fn open_external_url(url: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || open_external_url_blocking(&url))
+        .await
+        .map_err(|err| format!("open_external_url task failed: {err}"))?
 }
 
 /// 函数 `open_in_file_manager`

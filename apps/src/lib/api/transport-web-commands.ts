@@ -428,6 +428,19 @@ export function createWebCommandMap(
         return { ok: true };
       },
     },
+    open_external_url: {
+      direct: async (params) => {
+        const url = typeof params?.url === "string" ? params.url.trim() : "";
+        if (!url) {
+          throw new Error("缺少外部跳转地址");
+        }
+        if (typeof window === "undefined") {
+          throw new Error("当前环境不支持打开外部链接");
+        }
+        window.location.href = url;
+        return { ok: true };
+      },
+    },
     open_in_file_manager: {
       direct: async () => {
         throw new Error("当前环境不支持打开本地目录");

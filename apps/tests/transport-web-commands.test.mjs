@@ -95,3 +95,27 @@ test("createWebCommandMap 为显示主窗口提供 Web 回退", async () => {
     }
   }
 });
+
+test("createWebCommandMap 为外部协议跳转提供当前窗口回退", async () => {
+  const previousWindow = globalThis.window;
+  const location = { href: "/" };
+  globalThis.window = { location };
+
+  try {
+    const openExternalUrl = commandMap.open_external_url;
+    assert.ok(openExternalUrl.direct);
+    assert.deepEqual(
+      await openExternalUrl.direct({
+        url: " ccswitch://v1/import?resource=provider ",
+      }),
+      { ok: true }
+    );
+    assert.equal(location.href, "ccswitch://v1/import?resource=provider");
+  } finally {
+    if (previousWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = previousWindow;
+    }
+  }
+});

@@ -109,6 +109,7 @@ macro_rules! invoke_handler {
             crate::commands::apikey::service_apikey_enable,
             // system
             crate::commands::system::open_in_browser,
+            crate::commands::system::open_external_url,
             crate::commands::system::open_in_file_manager,
             crate::commands::system::app_window_unsaved_draft_sections_set,
             crate::commands::system::app_show_main_window,
