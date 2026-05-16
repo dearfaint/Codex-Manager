@@ -326,77 +326,128 @@ function DailyTokenLineChart({
 }) {
   const chartPoints = points.length > 0 ? points : [];
   const maxTokens = Math.max(1, ...chartPoints.map((item) => item.usage.totalTokens));
-  const width = 360;
-  const height = 132;
-  const paddingX = 12;
-  const paddingY = 14;
-  const plotWidth = width - paddingX * 2;
-  const plotHeight = height - paddingY * 2;
+  const width = 720;
+  const height = 240;
+  const padding = { top: 24, right: 18, bottom: 30, left: 50 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
   const coords = chartPoints.map((item, index) => {
     const x =
       chartPoints.length <= 1
-        ? width / 2
-        : paddingX + (index / (chartPoints.length - 1)) * plotWidth;
+        ? padding.left + plotWidth / 2
+        : padding.left + (index / (chartPoints.length - 1)) * plotWidth;
     const y =
-      paddingY + plotHeight - (item.usage.totalTokens / maxTokens) * plotHeight;
+      padding.top + plotHeight - (item.usage.totalTokens / maxTokens) * plotHeight;
     return { x, y, item };
   });
-  const linePath = coords
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+  const smoothPath = coords
+    .map((point, index) => {
+      if (index === 0) return `M ${point.x} ${point.y}`;
+      const previous = coords[index - 1];
+      const controlOffset = (point.x - previous.x) * 0.42;
+      return `C ${previous.x + controlOffset} ${previous.y}, ${point.x - controlOffset} ${point.y}, ${point.x} ${point.y}`;
+    })
     .join(" ");
   const areaPath =
     coords.length > 0
-      ? `${linePath} L ${coords[coords.length - 1].x} ${height - paddingY} L ${coords[0].x} ${height - paddingY} Z`
+      ? `${smoothPath} L ${coords[coords.length - 1].x} ${height - padding.bottom} L ${coords[0].x} ${height - padding.bottom} Z`
       : "";
+  const gridTicks = [0, 0.25, 0.5, 0.75, 1];
 
   return (
     <div className={cn("rounded-xl bg-background/30 p-3", className)}>
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="h-44 w-full overflow-visible"
+        className="h-64 w-full overflow-visible text-primary"
         role="img"
         aria-label="daily token usage line chart"
       >
         <defs>
           <linearGradient id="daily-token-area" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="currentColor" stopOpacity="0.22" />
-            <stop offset="100%" stopColor="currentColor" stopOpacity="0.02" />
+            <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
+            <stop offset="78%" stopColor="currentColor" stopOpacity="0.04" />
+            <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
           </linearGradient>
+          <filter id="daily-token-glow" x="-12%" y="-45%" width="124%" height="190%">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
-        <g className="text-primary">
-          {areaPath ? <path d={areaPath} fill="url(#daily-token-area)" /> : null}
-          {linePath ? (
-            <path
-              d={linePath}
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="3"
+        {gridTicks.map((tick) => {
+          const y = padding.top + plotHeight - tick * plotHeight;
+          const value = maxTokens * tick;
+          return (
+            <g key={tick}>
+              <line
+                x1={padding.left}
+                x2={width - padding.right}
+                y1={y}
+                y2={y}
+                className="stroke-border/60"
+                strokeDasharray="4 8"
+                strokeWidth="1"
+              />
+              <text
+                x={padding.left - 10}
+                y={y + 4}
+                textAnchor="end"
+                className="fill-muted-foreground text-[10px]"
+              >
+                {formatCompactTokenAmount(value)}
+              </text>
+            </g>
+          );
+        })}
+        {areaPath ? <path d={areaPath} fill="url(#daily-token-area)" /> : null}
+        {smoothPath ? (
+          <path
+            d={smoothPath}
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="4"
+            filter="url(#daily-token-glow)"
+            style={{ transition: "d 260ms ease, opacity 220ms ease" }}
+          />
+        ) : null}
+        {coords.map((point) => (
+          <g key={point.item.dayStartTs}>
+            <line
+              x1={point.x}
+              x2={point.x}
+              y1={padding.top}
+              y2={height - padding.bottom}
+              className="stroke-border/25"
+              strokeDasharray="3 10"
             />
-          ) : null}
-          {coords.map((point) => (
             <circle
-              key={point.item.dayStartTs}
               cx={point.x}
               cy={point.y}
-              r="3.6"
+              r="5"
               className="fill-background stroke-primary"
-              strokeWidth="2"
+              strokeWidth="3"
             >
               <title>
                 {formatShortDate(point.item.dayStartTs)} ·{" "}
-                {formatCompactTokenAmount(point.item.usage.totalTokens)}
+                {formatCompactTokenAmount(point.item.usage.totalTokens)} ·{" "}
+                {formatUsd(point.item.usage.estimatedCostUsd)}
               </title>
             </circle>
-          ))}
-        </g>
-      </svg>
-      <div className="mt-1 grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground">
-        {chartPoints.slice(-7).map((item) => (
-          <span key={item.dayStartTs}>{formatShortDate(item.dayStartTs)}</span>
+            <text
+              x={point.x}
+              y={height - 8}
+              textAnchor="middle"
+              className="fill-muted-foreground text-[10px]"
+            >
+              {formatShortDate(point.item.dayStartTs)}
+            </text>
+          </g>
         ))}
-      </div>
+      </svg>
     </div>
   );
 }
