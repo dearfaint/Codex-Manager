@@ -191,6 +191,13 @@ export const DEFAULT_FREE_ACCOUNT_MAX_MODEL_OPTIONS = [
   "gpt-5.4",
 ] as const;
 
+export const DEFAULT_COMPACT_MODEL_OPTIONS = [
+  "auto",
+  "gpt-5.4-mini",
+  "gpt-5.4",
+  "gpt-5.5",
+] as const;
+
 export function formatFreeAccountModelLabel(
   value: string | null | undefined,
 ): string {

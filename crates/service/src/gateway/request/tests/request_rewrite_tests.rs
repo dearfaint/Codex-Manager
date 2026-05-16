@@ -10,6 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const STRICT_REQUEST_PARAM_ALLOWLIST_ENV: &str = "CODEXMANAGER_STRICT_REQUEST_PARAM_ALLOWLIST";
 const CODEX_IMAGE_GENERATION_AUTO_INJECT_TOOL_ENV: &str =
     "CODEXMANAGER_CODEX_IMAGE_GENERATION_AUTO_INJECT_TOOL";
+const COMPACT_MODEL_ENV: &str = "CODEXMANAGER_COMPACT_MODEL";
 const CODEXMANAGER_DB_PATH_ENV: &str = "CODEXMANAGER_DB_PATH";
 
 struct RuntimeEnvGuard {
@@ -1877,6 +1878,58 @@ fn responses_compact_keeps_only_codex_compact_body_fields() {
     assert!(object.get("user").is_none());
     assert!(object.get("previous_response_id").is_none());
     assert!(object.get("unknown_field").is_none());
+}
+
+#[test]
+fn responses_compact_uses_configured_compact_model_before_attempt_override() {
+    let _guard = crate::test_env_guard();
+    let _compact_model = RuntimeEnvGuard::set(COMPACT_MODEL_ENV, "gpt-5.4-mini");
+    let body = json!({
+        "model": "gpt-5.5",
+        "instructions": "compact instructions",
+        "input": "compact me",
+        "reasoning": { "effort": "low" },
+        "tools": [],
+        "parallel_tool_calls": false
+    });
+
+    let out = apply_codex_compat_request_overrides(
+        "/v1/responses/compact",
+        serde_json::to_vec(&body).expect("serialize request body"),
+        Some("gpt-5.5"),
+        None,
+        Some("https://chatgpt.com/backend-api/codex"),
+    );
+    let value: serde_json::Value = serde_json::from_slice(&out).expect("parse output body");
+
+    assert_eq!(
+        value.get("model").and_then(serde_json::Value::as_str),
+        Some("gpt-5.4-mini")
+    );
+}
+
+#[test]
+fn responses_standard_path_ignores_configured_compact_model() {
+    let _guard = crate::test_env_guard();
+    let _compact_model = RuntimeEnvGuard::set(COMPACT_MODEL_ENV, "gpt-5.4-mini");
+    let body = json!({
+        "model": "gpt-5.5",
+        "input": "hello"
+    });
+
+    let out = apply_codex_compat_request_overrides(
+        "/v1/responses",
+        serde_json::to_vec(&body).expect("serialize request body"),
+        Some("gpt-5.5"),
+        None,
+        Some("https://chatgpt.com/backend-api/codex"),
+    );
+    let value: serde_json::Value = serde_json::from_slice(&out).expect("parse output body");
+
+    assert_eq!(
+        value.get("model").and_then(serde_json::Value::as_str),
+        Some("gpt-5.5")
+    );
 }
 
 #[test]

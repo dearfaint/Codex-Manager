@@ -473,6 +473,36 @@ pub(crate) fn current_free_account_max_model() -> String {
     runtime_config::current_free_account_max_model()
 }
 
+/// 函数 `current_compact_model`
+///
+/// 作者: gaohongshun
+///
+/// 时间: 2026-04-02
+///
+/// # 参数
+/// 无
+///
+/// # 返回
+/// 返回函数执行结果
+pub(crate) fn current_compact_model() -> String {
+    runtime_config::current_compact_model()
+}
+
+/// 函数 `current_compact_model_override`
+///
+/// 作者: gaohongshun
+///
+/// 时间: 2026-04-02
+///
+/// # 参数
+/// 无
+///
+/// # 返回
+/// 返回函数执行结果
+pub(crate) fn current_compact_model_override() -> Option<String> {
+    runtime_config::current_compact_model_override()
+}
+
 /// 函数 `current_model_forward_rules`
 ///
 /// 作者: gaohongshun
@@ -666,6 +696,21 @@ pub(crate) fn current_codex_user_agent() -> String {
 /// 返回函数执行结果
 pub(crate) fn set_free_account_max_model(model: &str) -> Result<String, String> {
     runtime_config::set_free_account_max_model(model)
+}
+
+/// 函数 `set_compact_model`
+///
+/// 作者: gaohongshun
+///
+/// 时间: 2026-04-02
+///
+/// # 参数
+/// - model: 参数 model
+///
+/// # 返回
+/// 返回函数执行结果
+pub(crate) fn set_compact_model(model: &str) -> Result<String, String> {
+    runtime_config::set_compact_model(model)
 }
 
 /// 函数 `set_model_forward_rules`

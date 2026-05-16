@@ -85,6 +85,7 @@ import { WebPasswordModal } from "@/components/modals/web-password-modal";
 import { useI18n } from "@/lib/i18n/provider";
 import {
   CUSTOM_WORKER_MODE_VALUE,
+  DEFAULT_COMPACT_MODEL_OPTIONS,
   DEFAULT_FREE_ACCOUNT_MAX_MODEL_OPTIONS,
   EMPTY_RESIDENCY_OPTION,
   ENV_DESCRIPTION_MAP,
@@ -1665,6 +1666,43 @@ function AdminSettingsPage() {
                 <p className="text-[10px] text-muted-foreground">
                   {t(
                     "设为“跟随请求”时，不会额外改写 free / 7天单窗口账号的模型；只有你选了具体模型后，命中这些账号时才会统一改写为该模型。",
+                  )}
+                </p>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>{t("上下文压缩模型")}</Label>
+                <Select
+                  value={snapshot.compactModel || "auto"}
+                  onValueChange={(value) =>
+                    updateSettings.mutate({
+                      compactModel: value || "auto",
+                    })
+                  }
+                >
+                  <SelectTrigger className="w-full md:w-[300px]">
+                    <SelectValue placeholder={t("选择上下文压缩模型")}>
+                      {(value) =>
+                        t(formatFreeAccountModelLabel(String(value || "")))
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {(snapshot.compactModelOptions?.length
+                        ? snapshot.compactModelOptions
+                        : DEFAULT_COMPACT_MODEL_OPTIONS
+                      ).map((model) => (
+                        <SelectItem key={model} value={model}>
+                          {t(formatFreeAccountModelLabel(model))}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground">
+                  {t(
+                    "仅改写 /v1/responses/compact 上下文压缩请求。设为“跟随请求”时保持 CLI 原始模型；遇到 5.4 / 5.5 压缩循环时可单独切到 gpt-5.4-mini。",
                   )}
                 </p>
               </div>

@@ -1770,6 +1770,12 @@ export function normalizeAppSettings(payload: unknown): AppSettings {
     freeAccountMaxModelOptions: asArray(source.freeAccountMaxModelOptions).map((item) =>
       asString(item)
     ),
+    compactModel: asString(source.compactModel ?? source.compact_model) || "auto",
+    compactModelOptions: (
+      asArray(source.compactModelOptions ?? source.compact_model_options).length > 0
+        ? asArray(source.compactModelOptions ?? source.compact_model_options)
+        : ["auto", "gpt-5.4-mini", "gpt-5.4", "gpt-5.5"]
+    ).map((item) => asString(item)),
     modelForwardRules: asString(source.modelForwardRules ?? source.model_forward_rules),
     accountMaxInflight: asInteger(source.accountMaxInflight, 1, 0),
     gatewayOriginator:
