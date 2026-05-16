@@ -1392,15 +1392,25 @@ fn init_upgrades_legacy_model_catalog_table_to_structured_schema() {
         .expect("check string items table");
     assert_eq!(string_items_table_exists, 1);
 
-    let legacy_plans_table_exists = storage
-        .conn
-        .query_row(
-            "SELECT COUNT(1) FROM sqlite_master WHERE type = 'table' AND name = 'model_catalog_available_in_plans'",
-            [],
-            |row| row.get::<_, i64>(0),
-        )
-        .expect("check legacy plans table");
-    assert_eq!(legacy_plans_table_exists, 0);
+    for legacy_table in [
+        "model_catalog_additional_speed_tiers",
+        "model_catalog_experimental_supported_tools",
+        "model_catalog_input_modalities",
+        "model_catalog_available_in_plans",
+    ] {
+        let legacy_table_exists = storage
+            .conn
+            .query_row(
+                "SELECT COUNT(1) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                [legacy_table],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("check legacy model catalog string table");
+        assert_eq!(
+            legacy_table_exists, 0,
+            "legacy table should not be recreated: {legacy_table}"
+        );
+    }
 }
 
 #[test]
