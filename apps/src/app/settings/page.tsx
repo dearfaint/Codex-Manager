@@ -778,6 +778,7 @@ function AdminSettingsPage() {
       : snapshot.webAuthMode === "password"
         ? "访问密码"
         : "公开访问";
+  const showAccessControlSettings = !isDesktopRuntime;
 
   const lastIntentThemeRef = useRef<string | null>(null);
   const lastIntentAppearancePresetRef = useRef<string | null>(null);
@@ -1419,43 +1420,45 @@ function AdminSettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="glass-card shadow-sm">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-primary" />
-                <CardTitle className="text-base">{t("访问控制")}</CardTitle>
-              </div>
-              <CardDescription>
-                {t("统一管理 Web 登录方式、访问密码和团队额度分发。")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Card size="sm">
-                <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Label>{t("当前访问方式")}</Label>
-                    <Badge variant="secondary">{t(webAuthModeLabel)}</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {snapshot.distributionEnabled
-                      ? t("额度分发已开启，平台 Key 会按归属钱包扣减额度。")
-                      : t("额度分发未开启，平台 Key 不会扣减成员钱包额度。")}
-                  </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="gap-2 self-start md:self-auto"
-                    disabled={!canAccessManagementRpc}
-                    onClick={() => setWebPasswordModalOpen(true)}
-                  >
-                    <ShieldCheck className="h-4 w-4" />
-                    {t("访问控制")}
-                  </Button>
-                </CardContent>
-              </Card>
-            </CardContent>
-          </Card>
+          {showAccessControlSettings ? (
+            <Card className="glass-card shadow-sm">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-base">{t("访问控制")}</CardTitle>
+                </div>
+                <CardDescription>
+                  {t("统一管理 Web 登录方式、访问密码和团队额度分发。")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Card size="sm">
+                  <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Label>{t("当前访问方式")}</Label>
+                        <Badge variant="secondary">{t(webAuthModeLabel)}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {snapshot.distributionEnabled
+                          ? t("额度分发已开启，平台 Key 会按归属钱包扣减额度。")
+                          : t("额度分发未开启，平台 Key 不会扣减成员钱包额度。")}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="gap-2 self-start md:self-auto"
+                      disabled={!canAccessManagementRpc}
+                      onClick={() => setWebPasswordModalOpen(true)}
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                      {t("访问控制")}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </CardContent>
+            </Card>
+          ) : null}
 
         </TabsContent>
 
@@ -2468,10 +2471,12 @@ function AdminSettingsPage() {
         </DialogContent>
       </Dialog>
 
-      <WebPasswordModal
-        open={webPasswordModalOpen}
-        onOpenChange={setWebPasswordModalOpen}
-      />
+      {showAccessControlSettings ? (
+        <WebPasswordModal
+          open={webPasswordModalOpen}
+          onOpenChange={setWebPasswordModalOpen}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={resetAllEnvDialogOpen}
