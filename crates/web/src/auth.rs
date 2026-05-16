@@ -176,6 +176,25 @@ fn login_force_requested(query: &LoginQuery) -> bool {
         .is_some_and(|value| matches!(value.as_str(), "1" | "true" | "yes" | "on"))
 }
 
+fn is_public_static_asset_path(path: &str) -> bool {
+    path.starts_with("/_next/")
+        || path.starts_with("/static/")
+        || path == "/favicon.ico"
+        || path == "/robots.txt"
+        || path == "/manifest.json"
+        || path.ends_with(".js")
+        || path.ends_with(".css")
+        || path.ends_with(".map")
+        || path.ends_with(".png")
+        || path.ends_with(".jpg")
+        || path.ends_with(".jpeg")
+        || path.ends_with(".webp")
+        || path.ends_with(".svg")
+        || path.ends_with(".ico")
+        || path.ends_with(".woff")
+        || path.ends_with(".woff2")
+}
+
 /// 函数 `request_is_authenticated`
 ///
 /// 作者: gaohongshun
@@ -575,7 +594,7 @@ pub(super) async fn web_auth_middleware(
     next: Next,
 ) -> Response {
     let path = request.uri().path().to_string();
-    if path == "/__login" || path == "/__logout" {
+    if path == "/__login" || path == "/__logout" || is_public_static_asset_path(&path) {
         return next.run(request).await;
     }
     if request_is_authenticated(request.headers(), state.as_ref()) {
@@ -855,5 +874,20 @@ mod tests {
         assert!(html.contains("sessionStorage.setItem"));
         assert!(html.contains(WEB_AUTH_TAB_SESSION_STORAGE_KEY));
         assert!(html.contains("location.replace(\"/\")"));
+    }
+
+    #[test]
+    fn web_auth_allows_static_assets_without_session() {
+        for path in [
+            "/_next/static/chunks/app/page.js",
+            "/_next/static/css/app.css",
+            "/favicon.ico",
+            "/author-alipay.jpg",
+            "/manifest.json",
+        ] {
+            assert!(is_public_static_asset_path(path), "path={path}");
+        }
+        assert!(!is_public_static_asset_path("/settings"));
+        assert!(!is_public_static_asset_path("/api/rpc"));
     }
 }
