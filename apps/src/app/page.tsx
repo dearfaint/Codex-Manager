@@ -24,9 +24,23 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ApiKeyModal } from "@/components/modals/api-key-modal";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -52,6 +66,13 @@ import { useI18n } from "@/lib/i18n/provider";
 import { cn } from "@/lib/utils";
 import { buildStaticRouteUrl } from "@/lib/utils/static-routes";
 import { formatLocalDateTimeFromSeconds } from "@/lib/utils/time";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type {
   DashboardAdminUsageSummary,
   DashboardDailyUsagePoint,
@@ -324,131 +345,103 @@ function DailyTokenLineChart({
   points: DashboardDailyUsagePoint[];
   className?: string;
 }) {
-  const chartPoints = points.length > 0 ? points : [];
-  const maxTokens = Math.max(1, ...chartPoints.map((item) => item.usage.totalTokens));
-  const width = 720;
-  const height = 240;
-  const padding = { top: 24, right: 18, bottom: 30, left: 50 };
-  const plotWidth = width - padding.left - padding.right;
-  const plotHeight = height - padding.top - padding.bottom;
-  const coords = chartPoints.map((item, index) => {
-    const x =
-      chartPoints.length <= 1
-        ? padding.left + plotWidth / 2
-        : padding.left + (index / (chartPoints.length - 1)) * plotWidth;
-    const y =
-      padding.top + plotHeight - (item.usage.totalTokens / maxTokens) * plotHeight;
-    return { x, y, item };
-  });
-  const smoothPath = coords
-    .map((point, index) => {
-      if (index === 0) return `M ${point.x} ${point.y}`;
-      const previous = coords[index - 1];
-      const controlOffset = (point.x - previous.x) * 0.42;
-      return `C ${previous.x + controlOffset} ${previous.y}, ${point.x - controlOffset} ${point.y}, ${point.x} ${point.y}`;
-    })
-    .join(" ");
-  const areaPath =
-    coords.length > 0
-      ? `${smoothPath} L ${coords[coords.length - 1].x} ${height - padding.bottom} L ${coords[0].x} ${height - padding.bottom} Z`
-      : "";
-  const gridTicks = [0, 0.25, 0.5, 0.75, 1];
+  const chartConfig = {
+    totalTokens: {
+      label: "Token",
+      color: "var(--primary)",
+    },
+  } satisfies ChartConfig;
+  const chartData = points.map((item) => ({
+    date: formatShortDate(item.dayStartTs),
+    totalTokens: item.usage.totalTokens,
+    estimatedCostUsd: item.usage.estimatedCostUsd,
+    requestCount: item.usage.requestCount,
+  }));
 
   return (
-    <div className={cn("rounded-xl bg-background/30 p-3", className)}>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="h-64 w-full overflow-visible text-primary"
-        role="img"
-        aria-label="daily token usage line chart"
+    <ChartContainer
+      config={chartConfig}
+      className={cn("h-64 w-full rounded-xl bg-background/30 p-3", className)}
+      initialDimension={{ width: 720, height: 256 }}
+    >
+      <AreaChart
+        accessibilityLayer
+        data={chartData}
+        margin={{ top: 18, right: 14, left: 10, bottom: 4 }}
       >
         <defs>
-          <linearGradient id="daily-token-area" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
-            <stop offset="78%" stopColor="currentColor" stopOpacity="0.04" />
-            <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-          </linearGradient>
-          <filter id="daily-token-glow" x="-12%" y="-45%" width="124%" height="190%">
-            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        {gridTicks.map((tick) => {
-          const y = padding.top + plotHeight - tick * plotHeight;
-          const value = maxTokens * tick;
-          return (
-            <g key={tick}>
-              <line
-                x1={padding.left}
-                x2={width - padding.right}
-                y1={y}
-                y2={y}
-                className="stroke-border/60"
-                strokeDasharray="4 8"
-                strokeWidth="1"
-              />
-              <text
-                x={padding.left - 10}
-                y={y + 4}
-                textAnchor="end"
-                className="fill-muted-foreground text-[10px]"
-              >
-                {formatCompactTokenAmount(value)}
-              </text>
-            </g>
-          );
-        })}
-        {areaPath ? <path d={areaPath} fill="url(#daily-token-area)" /> : null}
-        {smoothPath ? (
-          <path
-            d={smoothPath}
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="4"
-            filter="url(#daily-token-glow)"
-            style={{ transition: "d 260ms ease, opacity 220ms ease" }}
-          />
-        ) : null}
-        {coords.map((point) => (
-          <g key={point.item.dayStartTs}>
-            <line
-              x1={point.x}
-              x2={point.x}
-              y1={padding.top}
-              y2={height - padding.bottom}
-              className="stroke-border/25"
-              strokeDasharray="3 10"
+          <linearGradient id="fillTotalTokens" x1="0" y1="0" x2="0" y2="1">
+            <stop
+              offset="5%"
+              stopColor="var(--color-totalTokens)"
+              stopOpacity={0.32}
             />
-            <circle
-              cx={point.x}
-              cy={point.y}
-              r="5"
-              className="fill-background stroke-primary"
-              strokeWidth="3"
-            >
-              <title>
-                {formatShortDate(point.item.dayStartTs)} ·{" "}
-                {formatCompactTokenAmount(point.item.usage.totalTokens)} ·{" "}
-                {formatUsd(point.item.usage.estimatedCostUsd)}
-              </title>
-            </circle>
-            <text
-              x={point.x}
-              y={height - 8}
-              textAnchor="middle"
-              className="fill-muted-foreground text-[10px]"
-            >
-              {formatShortDate(point.item.dayStartTs)}
-            </text>
-          </g>
-        ))}
-      </svg>
-    </div>
+            <stop
+              offset="95%"
+              stopColor="var(--color-totalTokens)"
+              stopOpacity={0.03}
+            />
+          </linearGradient>
+        </defs>
+        <CartesianGrid vertical={false} strokeDasharray="4 8" />
+        <XAxis
+          dataKey="date"
+          tickLine={false}
+          axisLine={false}
+          tickMargin={10}
+          minTickGap={18}
+        />
+        <YAxis
+          tickLine={false}
+          axisLine={false}
+          tickMargin={10}
+          width={44}
+          tickFormatter={(value) => formatCompactTokenAmount(Number(value))}
+        />
+        <ChartTooltip
+          cursor={false}
+          content={
+            <ChartTooltipContent
+              indicator="line"
+              labelFormatter={(value) => value}
+              formatter={(value, name, item) => {
+                const row = item.payload as {
+                  estimatedCostUsd?: number;
+                  requestCount?: number;
+                };
+                return (
+                  <div className="grid min-w-36 gap-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">{String(name)}</span>
+                      <span className="font-mono font-medium text-foreground">
+                        {formatCompactTokenAmount(Number(value))}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                      <span>Cost</span>
+                      <span>{formatUsd(row.estimatedCostUsd)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                      <span>Requests</span>
+                      <span>{row.requestCount ?? 0}</span>
+                    </div>
+                  </div>
+                );
+              }}
+            />
+          }
+        />
+        <Area
+          dataKey="totalTokens"
+          type="monotone"
+          fill="url(#fillTotalTokens)"
+          stroke="var(--color-totalTokens)"
+          strokeWidth={3}
+          dot={{ r: 4, strokeWidth: 2, fill: "var(--background)" }}
+          activeDot={{ r: 6, strokeWidth: 2 }}
+        />
+      </AreaChart>
+    </ChartContainer>
   );
 }
 
@@ -467,9 +460,11 @@ function UsageRankList<T extends { todayUsage: DashboardTokenUsage; rangeUsage: 
     <div className="min-w-0">
       <div className="mb-2 text-xs font-semibold text-muted-foreground">{title}</div>
       {items.length === 0 ? (
-        <div className="rounded-lg bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
-          {emptyText}
-        </div>
+        <Empty className="min-h-20 border bg-muted/20 p-3">
+          <EmptyHeader>
+            <EmptyTitle>{emptyText}</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
       ) : (
         <div className="space-y-2">
           {items.slice(0, 5).map((item, index) => (
@@ -510,8 +505,12 @@ function AdminUsageAnalyticsCard({
   if (isError) {
     return (
       <Card className="glass-card border-none shadow-md">
-        <CardContent className="py-6 text-sm text-destructive">
-          {t("管理员用量分析读取失败")}
+        <CardContent>
+          <Alert variant="destructive">
+            <AlertTriangle />
+            <AlertTitle>{t("管理员用量分析读取失败")}</AlertTitle>
+            <AlertDescription>{t("请稍后重试或检查核心服务状态。")}</AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     );
@@ -519,8 +518,16 @@ function AdminUsageAnalyticsCard({
   if (!summary) {
     return (
       <Card className="glass-card border-none shadow-md">
-        <CardContent className="py-6 text-sm text-muted-foreground">
-          {t("管理员用量分析暂不可用")}
+        <CardContent>
+          <Empty className="min-h-40 border bg-muted/20">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <LineChart />
+              </EmptyMedia>
+              <EmptyTitle>{t("管理员用量分析暂不可用")}</EmptyTitle>
+              <EmptyDescription>{t("核心服务连接后会自动刷新。")}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         </CardContent>
       </Card>
     );
@@ -729,9 +736,14 @@ function AdminDashboard() {
           {isLoading || isQuotaModelPoolsLoading ? (
             <Skeleton className="h-24 w-full rounded-xl" />
           ) : modelPoolItems.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border/60 bg-background/35 px-4 py-5 text-sm text-muted-foreground">
-              {t("暂无可估算的模型额度池")}
-            </div>
+            <Empty className="min-h-28 border bg-background/35">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Database />
+                </EmptyMedia>
+                <EmptyTitle>{t("暂无可估算的模型额度池")}</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <div className="space-y-3">
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

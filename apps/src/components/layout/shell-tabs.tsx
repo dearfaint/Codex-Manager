@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { getTopLevelRouteLabel } from "@/lib/app-shell/top-level-routes";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { cn } from "@/lib/utils";
@@ -43,20 +44,23 @@ export function ShellTabs() {
                   : "border-border/70 bg-card/60 text-muted-foreground hover:bg-accent/70 hover:text-foreground",
               )}
             >
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 className="min-w-0 truncate"
                 onClick={() => navigateShellPath(path)}
               >
                 {label}
-              </button>
+              </Button>
 
               {canClose ? (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-xs"
                   aria-label={t("关闭 {label}", { label })}
                   className={cn(
-                    "ml-2 inline-flex h-4 w-4 items-center justify-center rounded-full transition-colors duration-150",
+                    "ml-2 rounded-full transition-colors duration-150",
                     isActive
                       ? "text-foreground/70 hover:bg-primary/15 hover:text-foreground"
                       : "text-muted-foreground/70 hover:bg-accent hover:text-foreground",
@@ -66,8 +70,8 @@ export function ShellTabs() {
                     closeShellTab(path);
                   }}
                 >
-                  <X className="h-3 w-3" />
-                </button>
+                  <X />
+                </Button>
               ) : null}
             </div>
           );

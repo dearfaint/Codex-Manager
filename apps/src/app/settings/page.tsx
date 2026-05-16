@@ -249,12 +249,13 @@ function MemberSettingsPage() {
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {THEMES.map((item) => (
-              <button
+              <Button
                 key={item.id}
                 type="button"
+                variant="outline"
                 onClick={() => setTheme(item.id)}
                 className={cn(
-                  "flex items-center gap-3 rounded-2xl border border-border/60 bg-background/45 p-3 text-left transition-colors hover:bg-accent/50",
+                  "flex h-auto items-center justify-start gap-3 rounded-2xl border border-border/60 bg-background/45 p-3 text-left transition-colors hover:bg-accent/50",
                   theme === item.id ? "ring-2 ring-primary/40" : "",
                 )}
               >
@@ -263,7 +264,7 @@ function MemberSettingsPage() {
                   style={{ backgroundColor: item.color }}
                 />
                 <span className="text-sm font-medium">{t(item.name)}</span>
-              </button>
+              </Button>
             ))}
           </div>
         </CardContent>
@@ -1463,11 +1464,13 @@ function AdminSettingsPage() {
                   );
                   const isActive = currentPreset === item.id;
                   return (
-                    <button
+                    <Button
                       key={item.id}
+                      type="button"
+                      variant="outline"
                       onClick={() => handleAppearancePresetChange(item.id)}
                       className={cn(
-                        "group relative rounded-2xl border p-4 text-left transition-all duration-300 hover:-translate-y-0.5",
+                        "group relative h-auto justify-start rounded-2xl p-4 text-left transition-all duration-300 hover:-translate-y-0.5",
                         isActive
                           ? "border-primary bg-primary/10 shadow-lg ring-1 ring-primary"
                           : "border-border/60 bg-background/50 hover:bg-accent/30",
@@ -1516,7 +1519,7 @@ function AdminSettingsPage() {
                           />
                         </div>
                       </div>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -1536,11 +1539,13 @@ function AdminSettingsPage() {
             <CardContent>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12">
                 {THEMES.map((item) => (
-                  <button
+                  <Button
                     key={item.id}
+                    type="button"
+                    variant="ghost"
                     onClick={() => handleThemeChange(item.id)}
                     className={cn(
-                      "group relative flex flex-col items-center gap-2.5 rounded-2xl border p-4 transition-all duration-300 hover:scale-105",
+                      "group relative h-auto flex-col items-center gap-2.5 rounded-2xl border p-4 transition-all duration-300 hover:scale-105",
                       theme === item.id
                         ? "border-primary bg-primary/10 shadow-lg ring-1 ring-primary"
                         : "border-transparent bg-muted/20 hover:bg-accent/40",
@@ -1565,7 +1570,7 @@ function AdminSettingsPage() {
                         <Check className="h-2.5 w-2.5" />
                       </div>
                     ) : null}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </CardContent>
@@ -2154,11 +2159,13 @@ function AdminSettingsPage() {
               <CardContent className="flex-1 overflow-y-auto p-2">
                 <div className="space-y-1">
                   {filteredEnvCatalog.map((item) => (
-                    <button
+                    <Button
                       key={item.key}
+                      type="button"
+                      variant="ghost"
                       onClick={() => setSelectedEnvKey(item.key)}
                       className={cn(
-                        "w-full rounded-md px-3 py-2 text-left text-sm transition-colors",
+                        "h-auto w-full justify-start rounded-md px-3 py-2 text-left text-sm transition-colors",
                         selectedEnvKey === item.key
                           ? "bg-primary text-primary-foreground"
                           : "hover:bg-accent",
@@ -2189,7 +2196,7 @@ function AdminSettingsPage() {
                       <code className="block truncate text-[10px] opacity-70">
                         {item.key}
                       </code>
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </CardContent>

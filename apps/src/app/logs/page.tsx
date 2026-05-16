@@ -1743,21 +1743,24 @@ function LogsPageContent() {
                 </div>
                 <div className="flex shrink-0 items-center gap-1 rounded-xl border border-border/60 bg-muted/30 p-1">
                   {["all", "2xx", "4xx", "5xx"].map((item) => (
-                    <button
+                    <Button
                       key={item}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => {
                         setFilter(item as StatusFilter);
                         setPage(1);
                       }}
                       className={cn(
-                        "rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-all",
+                        "h-auto rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-all",
                         filter === item
                           ? "bg-background text-foreground shadow-sm"
                           : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
                       )}
                     >
                       {item.toUpperCase()}
-                    </button>
+                    </Button>
                   ))}
                 </div>
                 <div className="flex shrink-0 items-center gap-2 xl:justify-self-end">
@@ -1800,18 +1803,21 @@ function LogsPageContent() {
                         ["today", t("今天")],
                       ] as Array<[TimeRangePreset, string]>
                     ).map(([value, label]) => (
-                      <button
+                      <Button
                         key={value}
+                        type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => applyTimePreset(value)}
                         className={cn(
-                          "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
+                          "h-auto rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
                           timePreset === value
                             ? "bg-background text-foreground shadow-sm"
                             : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
                         )}
                       >
                         {label}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -1854,12 +1860,14 @@ function LogsPageContent() {
                     {compactMetaText}
                   </div>
                   {hasActiveTimeRange ? (
-                    <button
-                      className="mt-1 text-xs text-primary hover:underline"
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="mt-1 h-auto p-0 text-xs text-primary hover:underline"
                       onClick={() => applyTimePreset("all")}
                     >
                       {t("清除时间筛选")}
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               </div>

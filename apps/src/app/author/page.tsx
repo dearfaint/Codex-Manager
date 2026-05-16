@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -10,6 +11,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+} from "@/components/ui/table";
 import { appClient } from "@/lib/api/app-client";
 import { useI18n } from "@/lib/i18n/provider";
 import {
@@ -56,14 +63,14 @@ function PartnerTable({
 }) {
   return (
     <div className="overflow-x-auto rounded-3xl border border-border/50 bg-background/40">
-      <table className="min-w-full border-collapse">
-        <tbody>
+      <Table className="min-w-full">
+        <TableBody>
           {items.map((item, index) => (
-            <tr
+            <TableRow
               key={item.key}
-              className={index === 0 ? "" : "border-t border-border/50"}
+              className={index === 0 ? "border-b-0" : ""}
             >
-              <td className="w-[180px] p-5 align-middle">
+              <TableCell className="w-[180px] p-5 align-middle">
                 <div className="flex items-center justify-center rounded-3xl border border-border/50 bg-white/95 p-4">
                   {item.imageSrc ? (
                     <img
@@ -79,8 +86,8 @@ function PartnerTable({
                     </div>
                   )}
                 </div>
-              </td>
-              <td className="p-5 align-middle">
+              </TableCell>
+              <TableCell className="p-5 align-middle">
                 <div className="space-y-3">
                   <div className="space-y-1">
                     <h3 className="text-base font-semibold text-foreground">
@@ -91,23 +98,24 @@ function PartnerTable({
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       onClick={() => {
                         void onOpenLink(item.href);
                       }}
-                      className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-all duration-200 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      className="rounded-full"
                     >
                       {translate(item.actionLabel)}
-                      <ExternalLink className="h-4 w-4" />
-                    </button>
+                      <ExternalLink data-icon="inline-end" />
+                    </Button>
                   </div>
                 </div>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -329,16 +337,17 @@ export default function AuthorPage() {
                 <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
                   Telegram
                 </p>
-                <button
+                <Button
                   type="button"
+                  variant="link"
                   onClick={() => {
                     void handleOpenLink(AUTHOR_TELEGRAM_GROUP_URL);
                   }}
-                  className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-primary transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="mt-3 h-auto p-0 font-semibold"
                 >
                   {t("加入 TG 群聊")}
-                  <ExternalLink className="h-4 w-4" />
-                </button>
+                  <ExternalLink data-icon="inline-end" />
+                </Button>
                 <p className="mt-3 text-xs leading-6 text-muted-foreground">
                   {t("README 里维护的官方群链接，打开后即可加入讨论。")}
                 </p>

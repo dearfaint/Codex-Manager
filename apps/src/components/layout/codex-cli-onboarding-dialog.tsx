@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useI18n } from "@/lib/i18n/provider";
+import { cn } from "@/lib/utils";
 import { copyTextToClipboard } from "@/lib/utils/clipboard";
 
 interface CodexCliOnboardingDialogProps {
@@ -372,15 +373,17 @@ export function CodexCliOnboardingDialog({
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {GUIDE_STEPS.map((step, index) => (
-                      <button
+                      <Button
                         key={step.title}
                         type="button"
+                        variant="outline"
                         onClick={() => setCurrentStep(index)}
-                        className={`rounded-2xl border px-3 py-3 text-left transition-colors ${
+                        className={cn(
+                          "h-auto justify-start rounded-2xl px-3 py-3 text-left transition-colors",
                           index === currentStep
                             ? "border-primary/40 bg-primary/10 text-foreground shadow-sm"
-                            : "border-border/60 bg-background/70 text-muted-foreground hover:bg-accent/50"
-                        }`}
+                            : "border-border/60 bg-background/70 text-muted-foreground hover:bg-accent/50",
+                        )}
                       >
                         <div className="text-xs font-semibold">
                           {t("步骤 {step}", { step: index + 1 })}
@@ -388,7 +391,7 @@ export function CodexCliOnboardingDialog({
                         <div className="mt-1 line-clamp-2 text-sm font-medium leading-6">
                           {t(step.title)}
                         </div>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>

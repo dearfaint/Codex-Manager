@@ -773,14 +773,15 @@ export default function PluginsPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
             {MARKET_MODE_OPTIONS.map((option) => (
-              <button
+              <Button
                 key={option.value}
                 type="button"
+                variant="outline"
                 onClick={() =>
                   setMarketModeDraft(normalizeMarketMode(option.value))
                 }
                 className={cn(
-                  "rounded-2xl border p-4 text-left transition-all",
+                  "h-auto justify-start rounded-2xl p-4 text-left transition-all",
                   marketMode === option.value
                     ? "border-primary/40 bg-primary/10 shadow-sm"
                     : "border-border/60 bg-background/40 hover:bg-background/70",
@@ -793,7 +794,7 @@ export default function PluginsPage() {
                 <div className="mt-1 text-xs leading-5 text-muted-foreground">
                   {t(option.description)}
                 </div>
-              </button>
+              </Button>
             ))}
           </div>
           {marketMode === "custom" ? (
@@ -858,12 +859,13 @@ export default function PluginsPage() {
                     ? updatableInstalledItems.length
                     : notInstalledCatalogItems.length;
               return (
-                <button
+                <Button
                   key={option.value}
                   type="button"
+                  variant="outline"
                   onClick={() => setPluginViewFilter(option.value)}
                   className={cn(
-                    "flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition-all",
+                    "flex h-auto items-center gap-2 rounded-full px-4 py-2 text-sm transition-all",
                     pluginViewFilter === option.value
                       ? "border-primary/40 bg-primary/10 text-primary shadow-sm"
                       : "border-border/60 bg-background/40 text-muted-foreground hover:bg-background/70",
@@ -871,7 +873,7 @@ export default function PluginsPage() {
                 >
                   <span>{t(option.label)}</span>
                   <Badge variant="secondary">{count}</Badge>
-                </button>
+                </Button>
               );
             })}
           </div>
