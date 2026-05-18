@@ -20,7 +20,7 @@ use rand::RngCore;
 use serde_json::Value;
 
 use super::model_pricing;
-use crate::account_plan::resolve_account_plan;
+use crate::account_plan::resolve_effective_account_plan;
 use crate::{refresh_aggregate_api_balance, storage_helpers::open_storage, usage_refresh};
 
 #[derive(Debug, Clone, Default)]
@@ -1162,20 +1162,12 @@ fn resolve_account_plan_type(
     usages: &HashMap<String, UsageSnapshotRecord>,
     subscriptions: &HashMap<String, AccountSubscription>,
 ) -> Option<String> {
-    if let Some(subscription) = subscriptions.get(account_id) {
-        if let Some(plan_type) = subscription
-            .plan_type
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            return Some(plan_type.to_ascii_lowercase());
-        }
-        if !subscription.has_subscription {
-            return Some("free".to_string());
-        }
-    }
-    resolve_account_plan(tokens.get(account_id), usages.get(account_id)).map(|plan| plan.normalized)
+    resolve_effective_account_plan(
+        tokens.get(account_id),
+        usages.get(account_id),
+        subscriptions.get(account_id),
+    )
+    .map(|plan| plan.normalized)
 }
 
 fn resolve_account_capacity(

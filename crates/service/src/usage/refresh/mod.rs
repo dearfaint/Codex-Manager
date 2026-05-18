@@ -638,6 +638,7 @@ fn refresh_account_snapshot(
             .upsert_account_subscription(
                 account_id,
                 subscription.has_subscription,
+                subscription.account_plan_type.as_deref(),
                 subscription.plan_type.as_deref(),
                 subscription.expires_at,
                 subscription.renews_at,

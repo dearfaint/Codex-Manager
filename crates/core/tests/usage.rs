@@ -1,4 +1,4 @@
-use codexmanager_core::usage::{parse_usage_snapshot, usage_endpoint};
+use codexmanager_core::usage::{accounts_check_endpoint, parse_usage_snapshot, usage_endpoint};
 use serde_json::json;
 
 /// 函数 `usage_snapshot_parsed`
@@ -79,4 +79,10 @@ fn usage_snapshot_parsed() {
 
     let url = usage_endpoint("https://chatgpt.com");
     assert_eq!(url, "https://chatgpt.com/backend-api/wham/usage");
+
+    let accounts_check_url = accounts_check_endpoint("https://chatgpt.com");
+    assert_eq!(
+        accounts_check_url,
+        "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27"
+    );
 }

@@ -1,12 +1,15 @@
 use chrono::DateTime;
-use codexmanager_core::usage::{subscription_endpoint, usage_endpoint};
+use codexmanager_core::usage::{accounts_check_endpoint, usage_endpoint};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_TYPE};
 use reqwest::Client;
 use reqwest::Proxy;
+use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{OnceLock, RwLock};
 use std::time::Duration;
 use tokio::runtime::{Builder, Runtime};
+
+use crate::account_plan::normalize_account_plan_value;
 
 static USAGE_HTTP_CLIENT: OnceLock<RwLock<Client>> = OnceLock::new();
 static SUBSCRIPTION_HTTP_CLIENT: OnceLock<RwLock<Client>> = OnceLock::new();
@@ -99,23 +102,58 @@ pub(crate) struct RefreshTokenResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(crate) struct AccountSubscriptionSnapshot {
     pub(crate) has_subscription: bool,
+    pub(crate) account_plan_type: Option<String>,
     pub(crate) plan_type: Option<String>,
     pub(crate) expires_at: Option<i64>,
     pub(crate) renews_at: Option<i64>,
 }
 
 #[derive(Debug, serde::Deserialize)]
-struct AccountSubscriptionResponse {
+struct AccountsCheckResponse {
     #[serde(default)]
-    id: Option<String>,
+    accounts: HashMap<String, AccountsCheckEntry>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct AccountsCheckEntry {
+    #[serde(default)]
+    account: Option<AccountsCheckAccount>,
+    #[serde(default)]
+    entitlement: Option<AccountsCheckEntitlement>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct AccountsCheckAccount {
     #[serde(default)]
     plan_type: Option<String>,
     #[serde(default)]
-    active_until: Option<String>,
+    is_default: Option<bool>,
+    #[serde(default)]
+    has_subscription: Option<bool>,
+    #[serde(default)]
+    has_active_subscription: Option<bool>,
+    #[serde(default)]
+    is_paid_subscription_active: Option<bool>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct AccountsCheckEntitlement {
+    #[serde(default)]
+    subscription_plan: Option<String>,
+    #[serde(default)]
+    expires_at: Option<String>,
+    #[serde(default)]
+    renews_at: Option<String>,
+    #[serde(default)]
+    next_renewal_at: Option<String>,
     #[serde(default)]
     next_credit_grant_update: Option<String>,
     #[serde(default)]
+    renewal_date: Option<String>,
+    #[serde(default)]
     will_renew: Option<bool>,
+    #[serde(default)]
+    has_active_subscription: Option<bool>,
 }
 
 /// 函数 `usage_http_runtime`
@@ -747,11 +785,101 @@ fn summarize_subscription_error_response(
     summarize_endpoint_error_response("subscription", status, headers, body, force_html_error)
 }
 
-fn normalize_optional_text(value: Option<&str>) -> Option<String> {
-    value
-        .map(str::trim)
-        .filter(|text| !text.is_empty())
-        .map(ToString::to_string)
+fn extract_accounts_check_plan_type(entry: &AccountsCheckEntry) -> Option<String> {
+    entry
+        .account
+        .as_ref()
+        .and_then(|value| value.plan_type.as_deref())
+        .or_else(|| {
+            entry.entitlement.as_ref().and_then(|value| {
+                value
+                    .subscription_plan
+                    .as_deref()
+                    .filter(|plan| !plan.trim().is_empty())
+            })
+        })
+        .and_then(normalize_account_plan_value)
+}
+
+fn extract_accounts_check_subscription_plan(entry: &AccountsCheckEntry) -> Option<String> {
+    entry
+        .entitlement
+        .as_ref()
+        .and_then(|value| value.subscription_plan.as_deref())
+        .or_else(|| {
+            entry
+                .account
+                .as_ref()
+                .and_then(|value| value.plan_type.as_deref())
+        })
+        .and_then(normalize_account_plan_value)
+}
+
+fn extract_accounts_check_expires_at(entry: &AccountsCheckEntry) -> Option<i64> {
+    parse_subscription_timestamp(
+        entry
+            .entitlement
+            .as_ref()
+            .and_then(|value| value.expires_at.as_deref()),
+    )
+}
+
+fn extract_accounts_check_renews_at(entry: &AccountsCheckEntry) -> Option<i64> {
+    let entitlement = entry.entitlement.as_ref()?;
+    parse_subscription_timestamp(entitlement.renews_at.as_deref())
+        .or_else(|| parse_subscription_timestamp(entitlement.next_renewal_at.as_deref()))
+        .or_else(|| parse_subscription_timestamp(entitlement.next_credit_grant_update.as_deref()))
+        .or_else(|| parse_subscription_timestamp(entitlement.renewal_date.as_deref()))
+}
+
+fn extract_accounts_check_has_subscription(entry: &AccountsCheckEntry) -> Option<bool> {
+    entry
+        .entitlement
+        .as_ref()
+        .and_then(|value| value.has_active_subscription)
+        .or_else(|| {
+            entry.account.as_ref().and_then(|value| {
+                value
+                    .has_subscription
+                    .or(value.has_active_subscription)
+                    .or(value.is_paid_subscription_active)
+            })
+        })
+}
+
+fn build_accounts_check_snapshot(entry: &AccountsCheckEntry) -> AccountSubscriptionSnapshot {
+    let account_plan_type = extract_accounts_check_plan_type(entry);
+    let plan_type =
+        extract_accounts_check_subscription_plan(entry).or_else(|| account_plan_type.clone());
+    let expires_at = extract_accounts_check_expires_at(entry);
+    let renews_at = extract_accounts_check_renews_at(entry).or_else(|| {
+        if entry
+            .entitlement
+            .as_ref()
+            .and_then(|value| value.will_renew)
+            .unwrap_or(false)
+        {
+            expires_at
+        } else {
+            None
+        }
+    });
+    let has_subscription = extract_accounts_check_has_subscription(entry).unwrap_or_else(|| {
+        account_plan_type
+            .as_deref()
+            .is_some_and(|value| value != "free")
+            || plan_type.as_deref().is_some_and(|value| value != "free")
+            || expires_at.is_some()
+            || renews_at.is_some()
+    });
+
+    AccountSubscriptionSnapshot {
+        has_subscription,
+        account_plan_type,
+        plan_type,
+        expires_at,
+        renews_at,
+    }
 }
 
 fn parse_subscription_timestamp(value: Option<&str>) -> Option<i64> {
@@ -966,6 +1094,68 @@ async fn fetch_usage_snapshot_async(
         .map_err(|e| format!("read usage endpoint json failed: {e}"))
 }
 
+async fn fetch_accounts_check_response_async(
+    base_url: &str,
+    bearer: &str,
+) -> Result<AccountsCheckResponse, String> {
+    let url = accounts_check_endpoint(base_url);
+    let build_request = || {
+        let client = subscription_http_client();
+        client
+            .get(&url)
+            .header("Authorization", format!("Bearer {bearer}"))
+            .header("Origin", "https://chatgpt.com")
+            .header("Referer", "https://chatgpt.com/")
+            .header("Accept", "application/json")
+    };
+    let resp = match build_request().send().await {
+        Ok(resp) => resp,
+        Err(first_err) => {
+            rebuild_subscription_http_client();
+            let retried = build_request().send().await;
+            match retried {
+                Ok(resp) => resp,
+                Err(second_err) => {
+                    return Err(format!(
+                        "{}; retry_after_client_rebuild: {}",
+                        first_err, second_err
+                    ));
+                }
+            }
+        }
+    };
+    if resp.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(AccountsCheckResponse {
+            accounts: HashMap::new(),
+        });
+    }
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let headers = resp.headers().clone();
+        let body = read_response_text(resp, USAGE_HTTP_TOTAL_TIMEOUT).await?;
+        return Err(summarize_subscription_error_response(
+            status, &headers, &body, false,
+        ));
+    }
+    let content_type = resp
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("");
+    if crate::gateway::is_html_content_type(content_type) {
+        let status = resp.status();
+        let headers = resp.headers().clone();
+        let body = read_response_text(resp, USAGE_HTTP_TOTAL_TIMEOUT).await?;
+        return Err(summarize_subscription_error_response(
+            status, &headers, &body, true,
+        ));
+    }
+
+    read_response_json(resp, USAGE_HTTP_TOTAL_TIMEOUT)
+        .await
+        .map_err(|e| format!("read accounts/check json failed: {e}"))
+}
+
 /// 函数 `fetch_account_subscription_async`
 ///
 /// 作者: gaohongshun
@@ -990,81 +1180,43 @@ async fn fetch_account_subscription_async(
     if normalized_account_id.is_empty() {
         return Ok(AccountSubscriptionSnapshot::default());
     }
+    let response = fetch_accounts_check_response_async(base_url, bearer).await?;
 
-    let url = subscription_endpoint(base_url, normalized_account_id);
-    let build_request = || {
-        let client = subscription_http_client();
-        // 中文注释：subscriptions 接口按官方最小画像访问，
-        // 这里只保留 Authorization，account_id 已在 query 里，不再附带额外业务头。
-        client
-            .get(&url)
-            .header("Authorization", format!("Bearer {bearer}"))
-    };
-    let resp = match build_request().send().await {
-        Ok(resp) => resp,
-        Err(first_err) => {
-            rebuild_subscription_http_client();
-            let retried = build_request().send().await;
-            match retried {
-                Ok(resp) => resp,
-                Err(second_err) => {
-                    return Err(format!(
-                        "{}; retry_after_client_rebuild: {}",
-                        first_err, second_err
-                    ));
-                }
-            }
+    if let Some(entry) = response.accounts.get(normalized_account_id) {
+        return Ok(build_accounts_check_snapshot(entry));
+    }
+
+    let mut default_snapshot = None;
+    let mut paid_snapshot = None;
+    let mut any_snapshot = None;
+    for entry in response.accounts.values() {
+        let snapshot = build_accounts_check_snapshot(entry);
+        if any_snapshot.is_none() {
+            any_snapshot = Some(snapshot.clone());
         }
-    };
-    if resp.status() == reqwest::StatusCode::NOT_FOUND {
-        return Ok(AccountSubscriptionSnapshot::default());
-    }
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let headers = resp.headers().clone();
-        let body = read_response_text(resp, USAGE_HTTP_TOTAL_TIMEOUT).await?;
-        return Err(summarize_subscription_error_response(
-            status, &headers, &body, false,
-        ));
-    }
-    let content_type = resp
-        .headers()
-        .get(CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("");
-    if crate::gateway::is_html_content_type(content_type) {
-        let status = resp.status();
-        let headers = resp.headers().clone();
-        let body = read_response_text(resp, USAGE_HTTP_TOTAL_TIMEOUT).await?;
-        return Err(summarize_subscription_error_response(
-            status, &headers, &body, true,
-        ));
+        if default_snapshot.is_none()
+            && entry
+                .account
+                .as_ref()
+                .and_then(|value| value.is_default)
+                .unwrap_or(false)
+        {
+            default_snapshot = Some(snapshot.clone());
+        }
+        if paid_snapshot.is_none()
+            && snapshot
+                .account_plan_type
+                .as_deref()
+                .is_some_and(|value| value != "free")
+        {
+            paid_snapshot = Some(snapshot);
+        }
     }
 
-    let response: AccountSubscriptionResponse = read_response_json(resp, USAGE_HTTP_TOTAL_TIMEOUT)
-        .await
-        .map_err(|e| format!("read subscription endpoint json failed: {e}"))?;
-    let plan_type = normalize_optional_text(response.plan_type.as_deref());
-    let expires_at = parse_subscription_timestamp(response.active_until.as_deref());
-    let renews_at = parse_subscription_timestamp(response.next_credit_grant_update.as_deref())
-        .or_else(|| {
-            if response.will_renew.unwrap_or(false) {
-                expires_at
-            } else {
-                None
-            }
-        });
-    let has_subscription = normalize_optional_text(response.id.as_deref()).is_some()
-        || plan_type.is_some()
-        || expires_at.is_some()
-        || renews_at.is_some();
-
-    Ok(AccountSubscriptionSnapshot {
-        has_subscription,
-        plan_type,
-        expires_at,
-        renews_at,
-    })
+    Ok(default_snapshot
+        .or(paid_snapshot)
+        .or(any_snapshot)
+        .unwrap_or_default())
 }
 
 /// 函数 `refresh_access_token`

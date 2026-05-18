@@ -357,12 +357,16 @@ fn start_mock_subscription_server(
             .find(|header| header.field.equiv("ChatGPT-Account-ID"))
             .map(|header| header.value.as_str().to_string());
         tx.send(RecordedHeaderRequest {
-            path,
+            path: path.clone(),
             authorization,
             chatgpt_account_id,
         })
         .expect("send subscription request");
-        let response = Response::from_string(response_body)
+        let body = match path.as_str() {
+            "/accounts/check/v4-2023-04-27" => response_body,
+            other => panic!("unexpected subscription path: {other}"),
+        };
+        let response = Response::from_string(body)
             .with_status_code(StatusCode(status))
             .with_header(
                 Header::from_bytes("Content-Type", "application/json")
@@ -376,7 +380,7 @@ fn start_mock_subscription_server(
 }
 
 fn start_mock_usage_refresh_server(
-    subscription_response_body: String,
+    accounts_check_response_body: String,
     usage_response_body: String,
 ) -> (
     String,
@@ -411,7 +415,7 @@ fn start_mock_usage_refresh_server(
             .expect("send usage refresh request");
 
             let response_body = match path.as_str() {
-                "/subscriptions?account_id=org-usage-refresh" => subscription_response_body.clone(),
+                "/accounts/check/v4-2023-04-27" => accounts_check_response_body.clone(),
                 "/api/codex/usage" => usage_response_body.clone(),
                 other => panic!("unexpected usage refresh path: {other}"),
             };
@@ -801,7 +805,14 @@ fn rpc_account_list_prefers_free_subscription_result_over_token_plan() {
         })
         .expect("insert token");
     storage
-        .upsert_account_subscription("acc-subscription-free", false, None, None, None)
+        .upsert_account_subscription(
+            "acc-subscription-free",
+            false,
+            Some("free"),
+            Some("free"),
+            None,
+            None,
+        )
         .expect("insert subscription result");
 
     let server = codexmanager_service::start_one_shot_server().expect("start server");
@@ -829,7 +840,88 @@ fn rpc_account_list_prefers_free_subscription_result_over_token_plan() {
             .and_then(|value| value.as_bool()),
         Some(false)
     );
-    assert_eq!(item.get("subscriptionPlan"), Some(&serde_json::Value::Null));
+    assert_eq!(
+        item.get("subscriptionPlan").and_then(|value| value.as_str()),
+        Some("free")
+    );
+}
+
+#[test]
+fn rpc_account_list_prefers_accounts_check_plan_over_subscription_plan() {
+    let ctx = RpcTestContext::new("rpc-account-list-accounts-check-plan");
+    let storage = Storage::open(ctx.db_path()).expect("open db");
+    storage.init().expect("init schema");
+    let now = now_ts();
+    storage
+        .insert_account(&Account {
+            id: "acc-accounts-check-plan".to_string(),
+            label: "Accounts Check Plan Account".to_string(),
+            issuer: "https://auth.openai.com".to_string(),
+            chatgpt_account_id: Some("org-accounts-check-plan".to_string()),
+            workspace_id: Some("org-accounts-check-plan".to_string()),
+            group_name: None,
+            sort: 0,
+            status: "active".to_string(),
+            created_at: now,
+            updated_at: now,
+        })
+        .expect("insert account");
+    storage
+        .insert_token(&Token {
+            account_id: "acc-accounts-check-plan".to_string(),
+            id_token: build_access_token(
+                "sub-accounts-check-plan",
+                "accounts-check-plan@example.com",
+                "org-accounts-check-plan",
+                "plus",
+            ),
+            access_token: build_access_token(
+                "sub-accounts-check-plan",
+                "accounts-check-plan@example.com",
+                "org-accounts-check-plan",
+                "plus",
+            ),
+            refresh_token: "refresh-accounts-check-plan".to_string(),
+            api_key_access_token: None,
+            last_refresh: now,
+        })
+        .expect("insert token");
+    storage
+        .upsert_account_subscription(
+            "acc-accounts-check-plan",
+            true,
+            Some("free"),
+            Some("plus"),
+            Some(1_778_038_289),
+            Some(1_776_655_889),
+        )
+        .expect("insert subscription result");
+
+    let server = codexmanager_service::start_one_shot_server().expect("start server");
+    let req = JsonRpcRequest {
+        id: 78.into(),
+        method: "account/list".to_string(),
+        params: None,
+        trace: None,
+    };
+    let json = serde_json::to_string(&req).expect("serialize");
+    let v = post_rpc(&server.addr, &json);
+    let item = v
+        .get("result")
+        .and_then(|value| value.get("items"))
+        .and_then(|value| value.as_array())
+        .and_then(|items| items.first())
+        .expect("account item");
+
+    assert_eq!(
+        item.get("planType").and_then(|value| value.as_str()),
+        Some("free")
+    );
+    assert_eq!(
+        item.get("subscriptionPlan")
+            .and_then(|value| value.as_str()),
+        Some("plus")
+    );
 }
 
 /// 函数 `rpc_account_update_profile_updates_label_note_tags_and_sort`
@@ -1765,12 +1857,21 @@ fn rpc_chatgpt_auth_tokens_login_enqueues_usage_refresh() {
         "org-usage-refresh",
         "pro",
     );
-    let subscription_response = serde_json::json!({
-        "id": "sub-record-usage-refresh",
-        "plan_type": "plus",
-        "active_until": "2026-05-06T03:31:29Z",
-        "next_credit_grant_update": "2026-04-20T03:31:29Z",
-        "will_renew": true
+    let accounts_check_response = serde_json::json!({
+        "accounts": {
+            "org-usage-refresh": {
+                "account": {
+                    "plan_type": "pro",
+                    "is_default": true
+                },
+                "entitlement": {
+                    "subscription_plan": "plus",
+                    "expires_at": "2026-05-06T03:31:29Z",
+                    "next_renewal_at": "2026-04-20T03:31:29Z",
+                    "has_active_subscription": true
+                }
+            }
+        }
     });
     let usage_response = serde_json::json!({
         "rate_limit": {
@@ -1787,8 +1888,8 @@ fn rpc_chatgpt_auth_tokens_login_enqueues_usage_refresh() {
         }
     });
     let (usage_base_url, request_rx, request_join) = start_mock_usage_refresh_server(
-        serde_json::to_string(&subscription_response)
-            .expect("serialize auto usage refresh subscription response"),
+        serde_json::to_string(&accounts_check_response)
+            .expect("serialize auto usage refresh accounts check response"),
         serde_json::to_string(&usage_response).expect("serialize auto usage response"),
     );
     let _auto_refresh_guard =
@@ -1816,16 +1917,13 @@ fn rpc_chatgpt_auth_tokens_login_enqueues_usage_refresh() {
 
     let first_request = request_rx
         .recv_timeout(Duration::from_secs(2))
-        .expect("receive auto subscription request");
+        .expect("receive auto accounts check request");
     let second_request = request_rx
         .recv_timeout(Duration::from_secs(2))
         .expect("receive auto usage request");
     request_join.join().expect("join auto usage refresh server");
 
-    assert_eq!(
-        first_request.path,
-        "/subscriptions?account_id=org-usage-refresh"
-    );
+    assert_eq!(first_request.path, "/accounts/check/v4-2023-04-27");
     assert_eq!(
         first_request.authorization.as_deref(),
         Some(format!("Bearer {access_token}").as_str())
@@ -1873,12 +1971,21 @@ fn rpc_chatgpt_auth_tokens_refresh_updates_access_token() {
     let _ctx = RpcTestContext::new("rpc-chatgpt-auth-tokens-refresh");
     let refreshed_access_token =
         build_access_token("sub-refresh", "refreshed@example.com", "org-refresh", "pro");
-    let subscription_response = serde_json::json!({
-        "id": "sub-record-refresh",
-        "plan_type": "plus",
-        "active_until": "2026-05-06T03:31:29Z",
-        "next_credit_grant_update": "2026-04-20T03:31:29Z",
-        "will_renew": true
+    let accounts_check_response = serde_json::json!({
+        "accounts": {
+            "org-refresh": {
+                "account": {
+                    "plan_type": "pro",
+                    "is_default": true
+                },
+                "entitlement": {
+                    "subscription_plan": "plus",
+                    "expires_at": "2026-05-06T03:31:29Z",
+                    "next_renewal_at": "2026-04-20T03:31:29Z",
+                    "has_active_subscription": true
+                }
+            }
+        }
     });
     let refresh_response = serde_json::json!({
         "access_token": refreshed_access_token,
@@ -1890,7 +1997,7 @@ fn rpc_chatgpt_auth_tokens_refresh_updates_access_token() {
     );
     let (usage_base_url, subscription_rx, subscription_join) = start_mock_subscription_server(
         200,
-        serde_json::to_string(&subscription_response).expect("serialize subscription response"),
+        serde_json::to_string(&accounts_check_response).expect("serialize subscription response"),
     );
     let _issuer_guard = EnvGuard::set("CODEXMANAGER_ISSUER", &issuer);
     let _client_id_guard = EnvGuard::set("CODEXMANAGER_CLIENT_ID", "client-test-rpc-refresh");
@@ -1944,7 +2051,7 @@ fn rpc_chatgpt_auth_tokens_refresh_updates_access_token() {
         refresh_result
             .get("chatgptPlanType")
             .and_then(|value| value.as_str()),
-        Some("plus")
+        Some("pro")
     );
     assert_eq!(
         refresh_result
@@ -1990,10 +2097,7 @@ fn rpc_chatgpt_auth_tokens_refresh_updates_access_token() {
     assert!(refresh_body.contains("grant_type=refresh_token"));
     assert!(refresh_body.contains("refresh_token=refresh-token-old"));
     assert!(refresh_body.contains("scope=openid+profile+email"));
-    assert_eq!(
-        subscription_request.path,
-        "/subscriptions?account_id=org-refresh"
-    );
+    assert_eq!(subscription_request.path, "/accounts/check/v4-2023-04-27");
     assert_eq!(
         subscription_request.authorization.as_deref(),
         Some(format!("Bearer {refreshed_access_token}").as_str())
@@ -2020,6 +2124,7 @@ fn rpc_chatgpt_auth_tokens_refresh_updates_access_token() {
         .expect("find subscription")
         .expect("subscription exists");
     assert!(subscription.has_subscription);
+    assert_eq!(subscription.account_plan_type.as_deref(), Some("pro"));
     assert_eq!(subscription.plan_type.as_deref(), Some("plus"));
     assert_eq!(subscription.expires_at, Some(1_778_038_289));
     assert_eq!(subscription.renews_at, Some(1_776_655_889));
@@ -2034,12 +2139,21 @@ fn rpc_usage_refresh_persists_subscription_fields() {
         "org-usage-refresh",
         "pro",
     );
-    let subscription_response = serde_json::json!({
-        "id": "sub-record-usage-refresh",
-        "plan_type": "plus",
-        "active_until": "2026-05-06T03:31:29Z",
-        "next_credit_grant_update": "2026-04-20T03:31:29Z",
-        "will_renew": true
+    let accounts_check_response = serde_json::json!({
+        "accounts": {
+            "org-usage-refresh": {
+                "account": {
+                    "plan_type": "pro",
+                    "is_default": true
+                },
+                "entitlement": {
+                    "subscription_plan": "plus",
+                    "expires_at": "2026-05-06T03:31:29Z",
+                    "next_renewal_at": "2026-04-20T03:31:29Z",
+                    "has_active_subscription": true
+                }
+            }
+        }
     });
     let usage_response = serde_json::json!({
         "rate_limit": {
@@ -2071,8 +2185,8 @@ fn rpc_usage_refresh_persists_subscription_fields() {
         ]
     });
     let (usage_base_url, request_rx, request_join) = start_mock_usage_refresh_server(
-        serde_json::to_string(&subscription_response)
-            .expect("serialize usage refresh subscription response"),
+        serde_json::to_string(&accounts_check_response)
+            .expect("serialize usage refresh accounts check response"),
         serde_json::to_string(&usage_response).expect("serialize usage response"),
     );
     let _usage_base_url_guard = EnvGuard::set("CODEXMANAGER_USAGE_BASE_URL", &usage_base_url);
@@ -2132,10 +2246,7 @@ fn rpc_usage_refresh_persists_subscription_fields() {
         .expect("receive second usage refresh request");
     request_join.join().expect("join usage refresh server");
 
-    assert_eq!(
-        first_request.path,
-        "/subscriptions?account_id=org-usage-refresh"
-    );
+    assert_eq!(first_request.path, "/accounts/check/v4-2023-04-27");
     assert_eq!(
         first_request.authorization.as_deref(),
         Some(format!("Bearer {access_token}").as_str())
@@ -2157,6 +2268,7 @@ fn rpc_usage_refresh_persists_subscription_fields() {
         .expect("find subscription")
         .expect("subscription exists");
     assert!(subscription.has_subscription);
+    assert_eq!(subscription.account_plan_type.as_deref(), Some("pro"));
     assert_eq!(subscription.plan_type.as_deref(), Some("plus"));
     assert_eq!(subscription.expires_at, Some(1_778_038_289));
     assert_eq!(subscription.renews_at, Some(1_776_655_889));

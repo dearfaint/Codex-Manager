@@ -196,6 +196,11 @@ pub fn subscription_endpoint(base_url: &str, account_id: &str) -> String {
     )
 }
 
+pub fn accounts_check_endpoint(base_url: &str) -> String {
+    let base = normalize_base_url(base_url);
+    format!("{base}/accounts/check/v4-2023-04-27")
+}
+
 /// 函数 `parse_usage_snapshot`
 ///
 /// 作者: gaohongshun

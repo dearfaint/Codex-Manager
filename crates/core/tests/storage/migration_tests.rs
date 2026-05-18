@@ -277,6 +277,24 @@ fn init_tracks_schema_migrations_and_is_idempotent() {
         )
         .expect("count 057 migration");
     assert_eq!(applied_057, 1);
+    let applied_063: i64 = storage
+        .conn
+        .query_row(
+            "SELECT COUNT(1) FROM schema_migrations WHERE version = '063_account_subscriptions_account_plan_type'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count 063 migration");
+    assert_eq!(applied_063, 1);
+    let applied_063: i64 = storage
+        .conn
+        .query_row(
+            "SELECT COUNT(1) FROM schema_migrations WHERE version = '063_account_subscriptions_account_plan_type'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count 063 migration");
+    assert_eq!(applied_063, 1);
 
     assert!(!storage
         .has_column("accounts", "note")
@@ -347,6 +365,9 @@ fn init_tracks_schema_migrations_and_is_idempotent() {
     assert!(storage
         .has_column("account_subscriptions", "plan_type")
         .expect("check account_subscriptions.plan_type"));
+    assert!(storage
+        .has_column("account_subscriptions", "account_plan_type")
+        .expect("check account_subscriptions.account_plan_type"));
     assert!(storage
         .has_column("account_subscriptions", "expires_at")
         .expect("check account_subscriptions.expires_at"));

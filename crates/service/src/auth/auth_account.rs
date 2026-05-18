@@ -10,6 +10,7 @@ use crate::account_identity::{
     build_account_storage_id, build_fallback_subject_key, clean_value,
     pick_existing_account_id_by_identity,
 };
+use crate::account_plan::resolve_effective_account_plan;
 use crate::account_status::mark_account_unavailable_for_auth_error;
 use crate::app_settings::{get_persisted_app_setting, save_persisted_app_setting};
 use crate::storage_helpers::open_storage;
@@ -339,12 +340,13 @@ pub(crate) fn refresh_current_chatgpt_auth_tokens(
         .upsert_account_subscription(
             &refreshed_account.id,
             subscription.has_subscription,
+            subscription.account_plan_type.as_deref(),
             subscription.plan_type.as_deref(),
             subscription.expires_at,
             subscription.renews_at,
         )
         .map_err(|err| format!("store account subscription failed: {err}"))?;
-    let chatgpt_plan_type = subscription.plan_type.clone().or_else(|| {
+    let chatgpt_plan_type = subscription.account_plan_type.clone().or_else(|| {
         plan_type_resolution
             .as_ref()
             .map(|plan| plan.normalized.clone())
@@ -580,19 +582,14 @@ fn current_account_payload(
     auth_mode: &str,
 ) -> CurrentAuthAccount {
     let claims = parse_id_token_claims(&token.access_token).ok();
-    let plan_type_resolution = resolve_plan_type_resolution(token, claims.as_ref());
     let subscription = storage
         .find_account_subscription(&account.id)
         .ok()
         .flatten();
-    let plan_type = subscription
+    let resolved_plan = resolve_effective_account_plan(Some(token), None, subscription.as_ref());
+    let plan_type = resolved_plan
         .as_ref()
-        .and_then(|value| value.plan_type.clone())
-        .or_else(|| {
-            plan_type_resolution
-                .as_ref()
-                .map(|plan| plan.normalized.clone())
-        })
+        .map(|plan| plan.normalized.clone())
         .unwrap_or_else(|| "unknown".to_string());
     CurrentAuthAccount {
         kind: auth_mode.to_string(),
@@ -602,7 +599,7 @@ fn current_account_payload(
             .and_then(|claims| claims.email.clone())
             .unwrap_or_else(|| account.label.clone()),
         plan_type,
-        plan_type_raw: plan_type_resolution.and_then(|plan| plan.raw),
+        plan_type_raw: resolved_plan.and_then(|plan| plan.raw),
         has_subscription: subscription.as_ref().map(|value| value.has_subscription),
         subscription_plan: subscription
             .as_ref()

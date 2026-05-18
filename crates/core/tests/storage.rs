@@ -561,6 +561,7 @@ fn storage_account_subscription_roundtrip_and_delete_cleanup() {
         .upsert_account_subscription(
             "acc-sub-1",
             true,
+            Some("pro"),
             Some("plus"),
             Some(1_746_501_889),
             Some(1_746_501_889),
@@ -572,6 +573,7 @@ fn storage_account_subscription_roundtrip_and_delete_cleanup() {
         .expect("find subscription")
         .expect("subscription exists");
     assert!(subscription.has_subscription);
+    assert_eq!(subscription.account_plan_type.as_deref(), Some("pro"));
     assert_eq!(subscription.plan_type.as_deref(), Some("plus"));
     assert_eq!(subscription.expires_at, Some(1_746_501_889));
     assert_eq!(subscription.renews_at, Some(1_746_501_889));

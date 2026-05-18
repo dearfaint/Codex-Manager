@@ -52,6 +52,7 @@ pub struct AccountMetadata {
 pub struct AccountSubscription {
     pub account_id: String,
     pub has_subscription: bool,
+    pub account_plan_type: Option<String>,
     pub plan_type: Option<String>,
     pub expires_at: Option<i64>,
     pub renews_at: Option<i64>,
@@ -1022,6 +1023,9 @@ impl Storage {
         )?;
         self.apply_compat_migration("062_observability_storage_compaction", |s| {
             s.compact_observability_storage_for_existing_databases()
+        })?;
+        self.apply_compat_migration("063_account_subscriptions_account_plan_type", |s| {
+            s.ensure_account_subscriptions_table()
         })?;
         self.ensure_api_key_rotation_columns()?;
         self.ensure_aggregate_apis_table()?;

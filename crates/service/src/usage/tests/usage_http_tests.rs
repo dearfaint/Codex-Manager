@@ -16,6 +16,9 @@ struct RecordedSubscriptionRequest {
     chatgpt_account_id: Option<String>,
     originator: Option<String>,
     residency: Option<String>,
+    origin: Option<String>,
+    referer: Option<String>,
+    accept: Option<String>,
 }
 
 /// 函数 `usage_header_runtime_scope`
@@ -480,21 +483,44 @@ fn subscription_request_uses_only_authorization_without_custom_usage_headers() {
             .iter()
             .find(|header| header.field.equiv("x-openai-internal-codex-residency"))
             .map(|header| header.value.as_str().to_string());
+        let origin = request
+            .headers()
+            .iter()
+            .find(|header| header.field.equiv("Origin"))
+            .map(|header| header.value.as_str().to_string());
+        let referer = request
+            .headers()
+            .iter()
+            .find(|header| header.field.equiv("Referer"))
+            .map(|header| header.value.as_str().to_string());
+        let accept = request
+            .headers()
+            .iter()
+            .find(|header| header.field.equiv("Accept"))
+            .map(|header| header.value.as_str().to_string());
         tx.send(RecordedSubscriptionRequest {
-            path,
+            path: path.clone(),
             authorization,
             chatgpt_account_id,
             originator,
             residency,
+            origin,
+            referer,
+            accept,
         })
         .expect("send subscription request");
-        let response = Response::from_string(
-            r#"{"id":"sub_123","plan_type":"plus","active_until":"2026-05-06T03:31:29Z"}"#,
-        )
-        .with_status_code(TinyStatusCode(200))
-        .with_header(
-            Header::from_bytes("Content-Type", "application/json").expect("content-type header"),
-        );
+        let response_body = match path.as_str() {
+            "/accounts/check/v4-2023-04-27" => {
+                r#"{"accounts":{"32673762-4fd7-4cef-8d9e-fa96aec5b5c4":{"account":{"plan_type":"pro","is_default":true},"entitlement":{"subscription_plan":"plus","expires_at":"2026-05-06T03:31:29Z","next_renewal_at":"2026-04-20T03:31:29Z","has_active_subscription":true}}}}"#
+            }
+            other => panic!("unexpected subscription path: {other}"),
+        };
+        let response = Response::from_string(response_body)
+            .with_status_code(TinyStatusCode(200))
+            .with_header(
+                Header::from_bytes("Content-Type", "application/json")
+                    .expect("content-type header"),
+            );
         request
             .respond(response)
             .expect("respond subscription request");
@@ -514,15 +540,18 @@ fn subscription_request_uses_only_authorization_without_custom_usage_headers() {
     handle.join().expect("join subscription server");
 
     assert!(snapshot.has_subscription);
+    assert_eq!(snapshot.account_plan_type.as_deref(), Some("pro"));
     assert_eq!(snapshot.plan_type.as_deref(), Some("plus"));
-    assert_eq!(
-        recorded.path,
-        "/subscriptions?account_id=32673762-4fd7-4cef-8d9e-fa96aec5b5c4"
-    );
+    assert_eq!(snapshot.expires_at, Some(1_778_038_289));
+    assert_eq!(snapshot.renews_at, Some(1_776_655_889));
+    assert_eq!(recorded.path, "/accounts/check/v4-2023-04-27");
     assert_eq!(recorded.authorization.as_deref(), Some("Bearer token_123"));
     assert_eq!(recorded.chatgpt_account_id, None);
     assert_eq!(recorded.originator, None);
     assert_eq!(recorded.residency, None);
+    assert_eq!(recorded.origin.as_deref(), Some("https://chatgpt.com"));
+    assert_eq!(recorded.referer.as_deref(), Some("https://chatgpt.com/"));
+    assert_eq!(recorded.accept.as_deref(), Some("application/json"));
 }
 
 /// 函数 `refresh_token_url_uses_official_default_for_openai_issuer`

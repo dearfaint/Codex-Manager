@@ -209,7 +209,7 @@ export default function UsageModal({
             <CardHeader>
               <CardTitle>{t("套餐信息")}</CardTitle>
               <CardDescription>
-                {t("这里展示订阅接口同步回来的套餐状态与时间信息。")}
+                {t("这里展示账号套餐接口同步回来的套餐状态与时间信息。")}
               </CardDescription>
             </CardHeader>
 

@@ -7,7 +7,7 @@ use codexmanager_core::{
 };
 use std::collections::HashMap;
 
-use crate::account_plan::resolve_account_plan;
+use crate::account_plan::resolve_effective_account_plan;
 use crate::storage_helpers::open_storage;
 
 const DEFAULT_ACCOUNT_PAGE_SIZE: i64 = 5;
@@ -454,10 +454,14 @@ fn map_account_summary(
     let account_id = account.id.clone();
     let status_reason = status_reasons.get(&account_id).cloned();
     let preferred = preferred_account_id.is_some_and(|id| id == account_id);
-    let plan = resolve_account_plan(tokens.get(&account_id), usages.get(&account_id));
+    let subscription = subscriptions.get(&account_id);
+    let plan = resolve_effective_account_plan(
+        tokens.get(&account_id),
+        usages.get(&account_id),
+        subscription,
+    );
     let has_token = tokens.contains_key(&account_id);
     let account_metadata = metadata.get(&account_id);
-    let subscription = subscriptions.get(&account_id);
     let model_slugs = model_slugs_by_account
         .get(&account_id)
         .cloned()
@@ -468,8 +472,7 @@ fn map_account_summary(
         None => (None, None),
     };
     let subscription_plan = subscription.and_then(|value| value.plan_type.clone());
-    let subscription_plan_type = subscription.and_then(resolve_subscription_plan_type);
-    let plan_type = subscription_plan_type.or(fallback_plan_type);
+    let plan_type = fallback_plan_type;
     to_account_summary_with_reason(
         account,
         preferred,
@@ -487,14 +490,4 @@ fn map_account_summary(
         quota_override.and_then(|value| value.primary_window_tokens),
         quota_override.and_then(|value| value.secondary_window_tokens),
     )
-}
-
-fn resolve_subscription_plan_type(subscription: &AccountSubscription) -> Option<String> {
-    if let Some(plan_type) = subscription.plan_type.clone() {
-        return Some(plan_type);
-    }
-    if !subscription.has_subscription {
-        return Some("free".to_string());
-    }
-    None
 }

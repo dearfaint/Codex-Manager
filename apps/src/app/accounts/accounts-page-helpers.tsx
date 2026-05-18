@@ -462,9 +462,20 @@ export function formatAccountSubscriptionStatusLabel(
     Boolean(String(account.subscriptionPlan || "").trim()) ||
     account.subscriptionExpiresAt != null ||
     account.subscriptionRenewsAt != null;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const isExpired =
+    account.subscriptionExpiresAt != null &&
+    account.subscriptionExpiresAt < nowSeconds &&
+    Boolean(String(account.subscriptionPlan || account.planType || "").trim());
 
-  if (account.hasSubscription === true || (account.hasSubscription == null && hasSubscriptionEvidence)) {
+  if (
+    account.hasSubscription === true ||
+    (account.hasSubscription == null && hasSubscriptionEvidence)
+  ) {
     return t("已订阅");
+  }
+  if (isExpired) {
+    return t("已过期");
   }
   if (account.hasSubscription === false) {
     return t("未订阅");

@@ -305,6 +305,7 @@ export const EN_MESSAGES: MessageCatalog = {
   到期时间: "Expiration time",
   续费时间: "Renewal time",
   已订阅: "Subscribed",
+  已过期: "Expired",
   未订阅: "Not subscribed",
   取消优先: "Unset preferred",
   详情与日志: "Details and logs",

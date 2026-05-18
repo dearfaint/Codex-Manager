@@ -1,6 +1,6 @@
 use codexmanager_core::{
     auth::parse_id_token_claims,
-    storage::{Storage, Token, UsageSnapshotRecord},
+    storage::{AccountSubscription, Storage, Token, UsageSnapshotRecord},
 };
 use serde_json::Value;
 
@@ -132,6 +132,25 @@ pub(crate) fn resolve_account_plan(
     }
 
     None
+}
+
+pub(crate) fn resolve_effective_account_plan(
+    token: Option<&Token>,
+    snapshot: Option<&UsageSnapshotRecord>,
+    subscription: Option<&AccountSubscription>,
+) -> Option<ResolvedAccountPlan> {
+    if let Some(plan) = subscription
+        .and_then(|value| value.account_plan_type.as_deref())
+        .and_then(normalize_plan_type)
+    {
+        return Some(plan);
+    }
+
+    resolve_account_plan(token, snapshot)
+}
+
+pub(crate) fn normalize_account_plan_value(value: &str) -> Option<String> {
+    normalize_plan_type(value).map(|plan| plan.normalized)
 }
 
 /// 函数 `extract_plan_type_from_credits_json`
