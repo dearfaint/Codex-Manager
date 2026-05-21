@@ -31,6 +31,7 @@ struct AnthropicSseState {
     total_tokens: Option<i64>,
     reasoning_output_tokens: i64,
     output_text: String,
+    emitted_text_to_client: bool,
     stop_reason: Option<&'static str>,
 }
 
@@ -249,6 +250,7 @@ impl AnthropicSseReader {
                         }
                     }),
                 );
+                self.state.emitted_text_to_client = true;
                 self.state.stop_reason.get_or_insert("end_turn");
             }
             "response.output_item.done" => {
@@ -331,8 +333,9 @@ impl AnthropicSseReader {
                     let mut extracted_output_text = String::new();
                     collect_response_output_text(response, &mut extracted_output_text);
                     if !extracted_output_text.trim().is_empty() {
-                        // 若已在流式过程中发过文本增量，不再重复把 completed 全文再发一遍。
-                        if self.state.text_block_index.is_none() {
+                        // Completed carries a full text snapshot. If any text delta was already
+                        // delivered, do not replay that snapshot after tool blocks close text.
+                        if !self.state.emitted_text_to_client {
                             append_output_text(
                                 &mut self.state.output_text,
                                 extracted_output_text.as_str(),
@@ -352,6 +355,7 @@ impl AnthropicSseReader {
                                     }
                                 }),
                             );
+                            self.state.emitted_text_to_client = true;
                         }
                         self.state.stop_reason.get_or_insert("end_turn");
                     }

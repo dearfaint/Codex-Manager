@@ -3,10 +3,10 @@ use super::openai::{
 };
 use super::{
     collect_non_stream_json_from_sse_bytes, inspect_sse_frame, parse_sse_frame_json,
-    parse_usage_from_json, parse_usage_from_sse_frame, ChatCompletionsFromResponsesSseReader,
-    GeminiSseReader, ImagesFromResponsesSseReader, ImagesResponseFormat,
-    OpenAIResponsesPassthroughSseReader, PassthroughSseCollector, PassthroughSseProtocol,
-    PassthroughSseUsageReader, SseKeepAliveFrame,
+    parse_usage_from_json, parse_usage_from_sse_frame, AnthropicSseReader,
+    ChatCompletionsFromResponsesSseReader, GeminiSseReader, ImagesFromResponsesSseReader,
+    ImagesResponseFormat, OpenAIResponsesPassthroughSseReader, PassthroughSseCollector,
+    PassthroughSseProtocol, PassthroughSseUsageReader, SseKeepAliveFrame,
 };
 use crate::gateway::GeminiStreamOutputMode;
 use serde_json::json;
@@ -469,6 +469,48 @@ fn anthropic_sse_reader_final_usage_contains_input_cache_and_output_tokens() {
     assert!(out.contains("\"output_tokens\":9"));
     assert!(out.contains("\"total_tokens\":40"));
     assert!(out.contains("\"reasoning_output_tokens\":2"));
+}
+
+#[test]
+fn anthropic_sse_reader_does_not_replay_completed_snapshot_after_tool_call() {
+    let (response, server) = open_streaming_mock_http_response(
+        "text/event-stream",
+        &[(
+            "event: response.output_text.delta\n\
+             data: {\"type\":\"response.output_text.delta\",\"delta\":\"hello before tool\"}\n\n\
+             event: response.output_item.done\n\
+             data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"call_id\":\"call_search_1\",\"name\":\"search\",\"arguments\":\"{\\\"query\\\":\\\"hello\\\"}\"}}\n\n\
+             event: response.completed\n\
+             data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_anthropic_dup\",\"model\":\"gpt-5.3-codex\",\"usage\":{\"input_tokens\":3,\"output_tokens\":2,\"total_tokens\":5},\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"hello before tool\"}]},{\"type\":\"function_call\",\"call_id\":\"call_search_1\",\"name\":\"search\",\"arguments\":\"{\\\"query\\\":\\\"hello\\\"}\"}]}}\n\n\
+             data: [DONE]\n\n",
+            0,
+        )],
+    );
+    let usage_collector = Arc::new(Mutex::new(super::UpstreamResponseUsage::default()));
+    let mut reader = AnthropicSseReader::new(
+        response,
+        Arc::clone(&usage_collector),
+        None,
+        None,
+        std::time::Instant::now(),
+    );
+    let mut out = String::new();
+    reader
+        .read_to_string(&mut out)
+        .expect("read anthropic sse reader");
+    server.join().expect("join streaming mock upstream");
+
+    assert_eq!(out.matches("\"text\":\"hello before tool\"").count(), 1);
+    assert!(out.contains("\"type\":\"tool_use\""));
+    assert!(out.contains("\"stop_reason\":\"tool_use\""));
+    let usage = usage_collector
+        .lock()
+        .expect("lock usage collector")
+        .clone();
+    assert_eq!(usage.output_text.as_deref(), Some("hello before tool"));
+    assert_eq!(usage.input_tokens, Some(3));
+    assert_eq!(usage.output_tokens, Some(2));
+    assert_eq!(usage.total_tokens, Some(5));
 }
 
 #[test]
