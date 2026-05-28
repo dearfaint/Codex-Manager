@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rusqlite::{OptionalExtension, Result};
+use rusqlite::{params_from_iter, types::Value, OptionalExtension, Result};
 
 use super::{now_ts, Storage};
 
@@ -52,6 +52,35 @@ impl Storage {
              WHERE quota_limit_tokens > 0",
         )?;
         let mut rows = stmt.query([])?;
+        let mut out = HashMap::new();
+        while let Some(row) = rows.next()? {
+            out.insert(row.get(0)?, row.get(1)?);
+        }
+        Ok(out)
+    }
+
+    pub fn list_api_key_quota_limits_for_ids(
+        &self,
+        key_ids: &[String],
+    ) -> Result<HashMap<String, i64>> {
+        let key_ids = normalize_key_ids(key_ids);
+        if key_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let placeholders = std::iter::repeat("?")
+            .take(key_ids.len())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "SELECT key_id, quota_limit_tokens
+             FROM api_key_quota_limits
+             WHERE quota_limit_tokens > 0
+               AND key_id IN ({placeholders})"
+        );
+        let params = key_ids.into_iter().map(Value::Text).collect::<Vec<_>>();
+        let mut stmt = self.conn.prepare(&sql)?;
+        let mut rows = stmt.query(params_from_iter(params.iter()))?;
         let mut out = HashMap::new();
         while let Some(row) = rows.next()? {
             out.insert(row.get(0)?, row.get(1)?);
@@ -122,4 +151,16 @@ impl Storage {
         )?;
         Ok(())
     }
+}
+
+fn normalize_key_ids(key_ids: &[String]) -> Vec<String> {
+    let mut normalized = key_ids
+        .iter()
+        .map(|key_id| key_id.trim())
+        .filter(|key_id| !key_id.is_empty())
+        .map(|key_id| key_id.to_string())
+        .collect::<Vec<_>>();
+    normalized.sort();
+    normalized.dedup();
+    normalized
 }

@@ -1,4 +1,4 @@
-use rusqlite::{Result, Row};
+use rusqlite::{params_from_iter, types::Value, Result, Row};
 
 use super::{now_ts, ApiKey, Storage};
 
@@ -101,6 +101,43 @@ impl Storage {
             .conn
             .prepare(&format!("{API_KEY_SELECT_SQL} ORDER BY k.created_at DESC"))?;
         let mut rows = stmt.query([])?;
+        let mut out = Vec::new();
+        while let Some(row) = rows.next()? {
+            out.push(map_api_key_row(row)?);
+        }
+        Ok(out)
+    }
+
+    /// 函数 `list_api_keys_for_ids`
+    ///
+    /// 作者: gaohongshun
+    ///
+    /// 时间: 2026-05-28
+    ///
+    /// # 参数
+    /// - self: 参数 self
+    /// - key_ids: 参数 key_ids
+    ///
+    /// # 返回
+    /// 返回函数执行结果
+    pub fn list_api_keys_for_ids(&self, key_ids: &[String]) -> Result<Vec<ApiKey>> {
+        let key_ids = normalize_key_ids(key_ids);
+        if key_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let placeholders = std::iter::repeat("?")
+            .take(key_ids.len())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "{API_KEY_SELECT_SQL}
+             WHERE k.id IN ({placeholders})
+             ORDER BY k.created_at DESC, k.id ASC"
+        );
+        let params = key_ids.into_iter().map(Value::Text).collect::<Vec<_>>();
+        let mut stmt = self.conn.prepare(&sql)?;
+        let mut rows = stmt.query(params_from_iter(params.iter()))?;
         let mut out = Vec::new();
         while let Some(row) = rows.next()? {
             out.push(map_api_key_row(row)?);
@@ -672,6 +709,18 @@ impl Storage {
         )?;
         Ok(())
     }
+}
+
+fn normalize_key_ids(key_ids: &[String]) -> Vec<String> {
+    let mut normalized = key_ids
+        .iter()
+        .map(|key_id| key_id.trim())
+        .filter(|key_id| !key_id.is_empty())
+        .map(|key_id| key_id.to_string())
+        .collect::<Vec<_>>();
+    normalized.sort();
+    normalized.dedup();
+    normalized
 }
 
 /// 函数 `map_api_key_row`
