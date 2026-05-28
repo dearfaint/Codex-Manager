@@ -152,6 +152,14 @@ where
     )
 }
 
+#[cfg(test)]
+fn response_adapter_uses_manual_chunked_streaming(response_adapter: ResponseAdapter) -> bool {
+    matches!(
+        response_adapter,
+        ResponseAdapter::ResponsesFromAnthropicMessages
+    )
+}
+
 /// 函数 `compact_debug_suffix`
 ///
 /// 作者: gaohongshun
@@ -2237,8 +2245,10 @@ pub(crate) fn respond_with_upstream(
                         fallback_model,
                         request_started_at,
                     ));
-                let response = Response::new(status, headers, response_body, None, None);
-                let delivery_error = request.respond(response).err().map(|err| err.to_string());
+                let delivery_error =
+                    respond_streaming_chunked(request, status, headers, response_body)
+                        .err()
+                        .map(|err| err.to_string());
                 let usage = usage_collector
                     .lock()
                     .map(|guard| guard.clone())
@@ -3256,8 +3266,10 @@ pub(crate) fn respond_with_stream_upstream(
                         fallback_model,
                         request_started_at,
                     ));
-                let response = Response::new(status, headers, response_body, None, None);
-                let delivery_error = request.respond(response).err().map(|err| err.to_string());
+                let delivery_error =
+                    respond_streaming_chunked(request, status, headers, response_body)
+                        .err()
+                        .map(|err| err.to_string());
                 let usage = usage_collector
                     .lock()
                     .map(|guard| guard.clone())
@@ -4037,8 +4049,9 @@ mod tests {
         convert_responses_body_to_chat_completions,
         convert_responses_body_to_gemini_generate_content, convert_responses_body_to_images,
         force_openai_responses_stream_content_type, gemini_cli_wrap_response_envelope,
-        merge_usage_from_body_without_output_text, write_streaming_chunked_response, HTTPVersion,
-        Header, ImagesResponseFormat, ResponseAdapter, StatusCode,
+        merge_usage_from_body_without_output_text, response_adapter_uses_manual_chunked_streaming,
+        write_streaming_chunked_response, HTTPVersion, Header, ImagesResponseFormat,
+        ResponseAdapter, StatusCode,
     };
     use serde_json::json;
     use std::io::{Read, Write};
@@ -4113,6 +4126,13 @@ mod tests {
         assert!(output.contains("9\r\ndata: b\n\n\r\n"));
         assert!(output.ends_with("0\r\n\r\n"));
         assert!(writer.flushes >= 4);
+    }
+
+    #[test]
+    fn responses_from_anthropic_streaming_uses_manual_chunked_delivery() {
+        assert!(response_adapter_uses_manual_chunked_streaming(
+            ResponseAdapter::ResponsesFromAnthropicMessages
+        ));
     }
 
     /// 函数 `compact_header_only_identity_error_is_normalized_and_classified`

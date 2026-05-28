@@ -54,16 +54,13 @@ pub(crate) fn adapt_openai_responses_to_anthropic_messages(
         "stream".to_string(),
         Value::Bool(obj.get("stream").and_then(Value::as_bool).unwrap_or(true)),
     );
-    rewritten.insert(
-        "max_tokens".to_string(),
-        Value::from(
-            obj.get("max_output_tokens")
-                .or_else(|| obj.get("max_tokens"))
-                .and_then(Value::as_i64)
-                .filter(|value| *value > 0)
-                .unwrap_or(4096),
-        ),
-    );
+    let max_tokens = obj
+        .get("max_output_tokens")
+        .or_else(|| obj.get("max_tokens"))
+        .and_then(Value::as_i64)
+        .filter(|value| *value > 0)
+        .unwrap_or(4096);
+    rewritten.insert("max_tokens".to_string(), Value::from(max_tokens));
 
     let mut system_parts = Vec::new();
     if let Some(instructions) = obj
@@ -96,7 +93,7 @@ pub(crate) fn adapt_openai_responses_to_anthropic_messages(
             rewritten.insert("tool_choice".to_string(), tool_choice);
         }
     }
-    if let Some(thinking) = responses_reasoning_to_anthropic(obj.get("reasoning")) {
+    if let Some(thinking) = responses_reasoning_to_anthropic(obj.get("reasoning"), max_tokens) {
         rewritten.insert("thinking".to_string(), thinking);
     }
 
@@ -665,7 +662,7 @@ fn responses_tool_choice_to_anthropic(tool_choice: Option<&Value>) -> Option<Val
     }
 }
 
-fn responses_reasoning_to_anthropic(reasoning: Option<&Value>) -> Option<Value> {
+fn responses_reasoning_to_anthropic(reasoning: Option<&Value>, max_tokens: i64) -> Option<Value> {
     let obj = reasoning?.as_object()?;
     let effort = obj
         .get("effort")
@@ -675,11 +672,15 @@ fn responses_reasoning_to_anthropic(reasoning: Option<&Value>) -> Option<Value> 
     if effort.eq_ignore_ascii_case("none") {
         return Some(json!({ "type": "disabled" }));
     }
+    if max_tokens <= 1024 {
+        return None;
+    }
     let budget = match effort.to_ascii_lowercase().as_str() {
         "minimal" | "low" => 1024,
         "high" | "xhigh" => 8192,
         _ => 4096,
-    };
+    }
+    .min(max_tokens - 1);
     Some(json!({
         "type": "enabled",
         "budget_tokens": budget,
@@ -2354,6 +2355,32 @@ mod tests {
         assert_eq!(payload["messages"][2]["content"][0]["type"], "tool_result");
         assert_eq!(payload["tools"][0]["name"], "read_file");
         assert_eq!(payload["thinking"]["type"], "enabled");
+    }
+
+    #[test]
+    fn responses_reasoning_budget_stays_below_max_tokens() {
+        let body = json!({
+            "model": "gpt-5.3",
+            "max_output_tokens": 2048,
+            "input": "think carefully",
+            "reasoning": { "effort": "high" }
+        });
+
+        let adapted = adapt_openai_responses_to_anthropic_messages(
+            serde_json::to_vec(&body).expect("body").as_slice(),
+            Some("claude-sonnet-4"),
+        )
+        .expect("adapt responses request");
+        let payload: Value = serde_json::from_slice(&adapted).expect("parse adapted body");
+
+        let max_tokens = payload["max_tokens"].as_i64().expect("max tokens");
+        let budget_tokens = payload["thinking"]["budget_tokens"]
+            .as_i64()
+            .expect("budget tokens");
+        assert!(
+            budget_tokens < max_tokens,
+            "Anthropic thinking budget_tokens must be lower than max_tokens"
+        );
     }
 
     #[test]
