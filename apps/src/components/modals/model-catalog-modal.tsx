@@ -353,9 +353,8 @@ export function ModelCatalogModal({
     const cp = draft.cachedInputPricePer1m.trim();
     const op = draft.outputPricePer1m.trim();
     const hasUserInput = ip !== "" || cp !== "" || op !== "";
-    const hasExisting = priceRule != null;
 
-    if (hasUserInput || hasExisting) {
+    if (hasUserInput) {
       const inputNum = ip !== "" ? Number(ip) : (priceRule?.inputPricePer1m ?? null);
       const cachedNum = cp !== "" ? Number(cp) : (priceRule?.cachedInputPricePer1m ?? null);
       const outputNum = op !== "" ? Number(op) : (priceRule?.outputPricePer1m ?? null);
@@ -381,14 +380,14 @@ export function ModelCatalogModal({
       model: nextModel,
     });
     if (saved) {
-      if (onSavePriceRule && slug && (hasUserInput || hasExisting)) {
+      if (onSavePriceRule && slug && hasUserInput) {
         try {
           setSavingPrice(true);
           await onSavePriceRule({
             modelPattern: slug,
-            inputPricePer1m: hasUserInput ? (ip !== "" ? Number(ip) : (priceRule?.inputPricePer1m ?? null)) : null,
-            cachedInputPricePer1m: hasUserInput ? (cp !== "" ? Number(cp) : (priceRule?.cachedInputPricePer1m ?? null)) : null,
-            outputPricePer1m: hasUserInput ? (op !== "" ? Number(op) : (priceRule?.outputPricePer1m ?? null)) : null,
+            inputPricePer1m: ip !== "" ? Number(ip) : (priceRule?.inputPricePer1m ?? null),
+            cachedInputPricePer1m: cp !== "" ? Number(cp) : (priceRule?.cachedInputPricePer1m ?? null),
+            outputPricePer1m: op !== "" ? Number(op) : (priceRule?.outputPricePer1m ?? null),
           });
         } catch (error) {
           setPriceError(
