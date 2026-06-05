@@ -1024,6 +1024,8 @@ export const KO_MESSAGES: MessageCatalog = {
   "中 (medium)": "중간 (medium)",
   总费用: "총 비용",
   "总使用 Token": "총 Token 사용량",
+  最近调用: "최근 호출",
+  从未调用: "호출 없음",
   "走 Claude 语义，": "Claude 의미 사용,",
   "Fast 会映射为上游 priority；未设置时跟随请求。":
     "Fast는 업스트림 priority로 매핑되며, 미설정 시 요청을 따릅니다.",

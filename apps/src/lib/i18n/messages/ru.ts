@@ -1030,6 +1030,8 @@ export const RU_MESSAGES: MessageCatalog = {
   "中 (medium)": "Средний (medium)",
   总费用: "Общая стоимость",
   "总使用 Token": "Общий расход Token",
+  最近调用: "Последний вызов",
+  从未调用: "Никогда не вызывался",
   "走 Claude 语义，": "Использует семантику Claude,",
   "Fast 会映射为上游 priority；未设置时跟随请求。":
     "Fast будет сопоставлен с upstream priority; если не задано — следует запросу.",

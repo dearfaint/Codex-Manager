@@ -175,6 +175,8 @@ export const EN_MESSAGES: MessageCatalog = {
   聚合API轮转: "Aggregate API rotation",
   "混合轮转（账号优先）": "Hybrid rotation (accounts first)",
   "总使用 Token": "Total token usage",
+  最近调用: "Last called",
+  从未调用: "Never called",
   总费用: "Total cost",
   按全部平台密钥累计: "Aggregated across all API keys",
   协议: "Protocol",
