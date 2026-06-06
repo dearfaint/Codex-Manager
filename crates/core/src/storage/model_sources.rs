@@ -503,6 +503,22 @@ impl Storage {
         let rows = stmt.query_map(params![&source_kind, &source_id], map_preference)?;
         rows.collect()
     }
+
+    pub fn delete_model_source_routes_for_platform_model(
+        &self,
+        platform_model_slug: &str,
+    ) -> Result<()> {
+        let slug = normalize_text(platform_model_slug);
+        if slug.is_empty() {
+            return Ok(());
+        }
+        self.conn.execute(
+            "DELETE FROM model_source_mappings
+             WHERE platform_model_slug = ?1",
+            params![&slug],
+        )?;
+        Ok(())
+    }
 }
 
 fn map_preference(row: &Row<'_>) -> Result<ModelSourceMappingPreference> {
@@ -513,4 +529,5 @@ fn map_preference(row: &Row<'_>) -> Result<ModelSourceMappingPreference> {
         preference: row.get(3)?,
         updated_at: row.get(4)?,
     })
+}
 }

@@ -914,6 +914,13 @@ export const accountClient = {
     );
     return result;
   },
+  async pruneStaleRemoteManagedModels(): Promise<ManagedModelCatalog> {
+    const result = await invoke<unknown>(
+      "service_model_catalog_prune_stale_remote",
+      withAddr()
+    );
+    return normalizeManagedModelCatalog(result);
+  },
   async readApiKeySecret(keyId: string): Promise<string> {
     const result = await invoke<unknown>(
       "service_apikey_read_secret",

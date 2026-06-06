@@ -34,7 +34,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   Empty,
-  EmptyDescription,
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
@@ -132,6 +131,7 @@ export default function ModelsPage() {
     isLoading,
     isServiceReady,
     refreshRemote,
+    pruneStaleRemoteModels,
     saveModel,
     saveModelPriceRule,
     readModelPriceRule,
@@ -141,6 +141,7 @@ export default function ModelsPage() {
     routing,
     canExportCodexCache,
     isRefreshing,
+    isPruningStaleRemote,
     isSaving,
     isDeleting,
     isExporting,
@@ -637,12 +638,24 @@ export default function ModelsPage() {
                     <Button
                       variant="outline"
                       onClick={() => void refreshRemote()}
-                      disabled={isRefreshing}
+                      disabled={isRefreshing || isPruningStaleRemote}
                     >
                       <RefreshCw
                         className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
                       />
                       {t("远端并入")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => void pruneStaleRemoteModels()}
+                      disabled={isRefreshing || isPruningStaleRemote}
+                      title={t("仅删除未本地覆写且不再出现在远端目录中的远端模型，不会删除自定义模型。")}
+                    >
+                      <Trash2
+                        className={`mr-2 h-4 w-4 ${isPruningStaleRemote ? "animate-pulse" : ""}`}
+                      />
+                      {t("清理远端旧模型")}
                     </Button>
                     {canExportCodexCache ? (
                       <Button

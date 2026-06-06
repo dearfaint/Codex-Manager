@@ -181,6 +181,23 @@ export function useManagedModels() {
     },
   });
 
+  const pruneStaleRemoteMutation = useMutation({
+    mutationFn: () => accountClient.pruneStaleRemoteManagedModels(),
+    onSuccess: async (catalog) => {
+      queryClient.setQueryData(MANAGED_MODEL_QUERY_KEY, catalog);
+      const cacheSyncError = await syncCatalogToCodexCache(catalog);
+      await invalidateAll();
+      if (cacheSyncError) {
+        toast.error(`${t("远端旧模型已清理，但同步 Codex 模型缓存失败")}: ${cacheSyncError}`);
+      } else {
+        toast.success(t("远端旧模型已清理"));
+      }
+    },
+    onError: (error: unknown) => {
+      toast.error(`${t("清理远端旧模型失败")}: ${getAppErrorMessage(error)}`);
+    },
+  });
+
   const saveMutation = useMutation({
     mutationFn: (params: ManagedModelPayload) => accountClient.saveManagedModel(params),
     onSuccess: async () => {
@@ -406,6 +423,10 @@ export function useManagedModels() {
       if (!ensureServiceReady("读取模型")) return null;
       return refreshMutation.mutateAsync(false);
     },
+    pruneStaleRemoteModels: async () => {
+      if (!ensureServiceReady("清理远端旧模型")) return null;
+      return pruneStaleRemoteMutation.mutateAsync();
+    },
     saveModel: async (params: ManagedModelPayload) => {
       if (!ensureServiceReady("保存模型")) return null;
       return saveMutation.mutateAsync(params);
@@ -464,6 +485,7 @@ export function useManagedModels() {
       return true;
     },
     isRefreshing: refreshMutation.isPending,
+    isPruningStaleRemote: pruneStaleRemoteMutation.isPending,
     isSaving: saveMutation.isPending,
     isDeleting: deleteMutation.isPending || batchDeleteMutation.isPending,
     isExporting: exportMutation.isPending,

@@ -191,6 +191,18 @@ pub(super) fn try_handle(req: &JsonRpcRequest, actor: &RpcActor) -> Option<JsonR
             let slug = super::str_param(req, "slug").unwrap_or("");
             super::ok_or_error(apikey_models::delete_managed_model_catalog_model(slug))
         }
+        "apikey/modelCatalogPruneStaleRemote" => {
+            if !actor.is_admin() {
+                super::value_or_error::<ManagedModelCatalogResult>(Err(super::permission_denied(
+                    "apikey/modelCatalogPruneStaleRemote",
+                )))
+            } else {
+                super::value_or_error(
+                    apikey_models::prune_stale_remote_managed_model_catalog()
+                        .and_then(|catalog| filter_catalog_for_actor(actor, catalog)),
+                )
+            }
+        }
         "apikey/modelRouting" => {
             if actor.is_admin() {
                 super::value_or_error(apikey_models::read_managed_model_routing())

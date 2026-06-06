@@ -1441,6 +1441,13 @@ export const EN_MESSAGES: MessageCatalog = {
   "按 slug、显示名称或描述快速定位，并结合来源与覆写状态查看当前目录。":
     "Quickly locate entries by slug, display name, or description, and review the current catalog together with source and override status.",
   "远端并入": "Merge remote",
+  "清理远端旧模型": "Prune stale remote models",
+  "远端旧模型已清理": "Stale remote models pruned",
+  "清理远端旧模型失败": "Failed to prune stale remote models",
+  "远端旧模型已清理，但同步 Codex 模型缓存失败":
+    "Stale remote models were pruned, but syncing the Codex model cache failed",
+  "仅删除未本地覆写且不再出现在远端目录中的远端模型，不会删除自定义模型。":
+    "Only deletes remote models that have no local override and no longer appear in the remote catalog. Custom models are not deleted.",
   "新增自定义模型": "Add custom model",
   "模型总数": "Total models",
   "API 可用": "API available",

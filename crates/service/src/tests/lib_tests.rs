@@ -1,6 +1,8 @@
 use super::*;
 use codexmanager_core::rpc::types::{JsonRpcMessage, JsonRpcResponse};
-use codexmanager_core::storage::{ModelGroupModel, RequestLog, RequestTokenStat};
+use codexmanager_core::storage::{
+    ModelCatalogModelRecord, ModelGroupModel, RequestLog, RequestTokenStat,
+};
 
 /// 函数 `response_result`
 ///
@@ -199,6 +201,27 @@ fn password_mode_can_call_admin_and_model_source_rpcs() {
 }
 
 #[test]
+fn password_mode_member_cannot_prune_stale_remote_catalog() {
+    let _guard = test_env_guard();
+    let db_path = setup_dashboard_test_db("codexmanager-member-prune-stale-remote-denied");
+    set_web_access_password(Some("password123")).expect("set web password");
+    set_web_auth_mode("password").expect("enable password mode");
+
+    let resp = response_result(handle_request_with_actor(
+        rpc_request("apikey/modelCatalogPruneStaleRemote", serde_json::json!({})),
+        RpcActor::from_parts(Some(ROLE_MEMBER), Some("member-user")),
+    ));
+
+    assert!(
+        rpc_error(&resp).contains("permission_denied"),
+        "{:?}",
+        resp.result
+    );
+
+    let _ = std::fs::remove_file(db_path);
+}
+
+#[test]
 fn admin_user_update_edits_member_and_protects_last_active_admin() {
     let _guard = test_env_guard();
     let db_path = setup_dashboard_test_db("codexmanager-user-update");
@@ -323,6 +346,49 @@ fn create_owned_test_api_key(user_id: &str, name: &str, model: &str) -> String {
     created.id
 }
 
+fn seed_test_catalog_model(slug: &str) {
+    let storage = storage_helpers::open_storage().expect("open storage");
+    let now = codexmanager_core::storage::now_ts();
+    storage
+        .upsert_model_catalog_models(&[ModelCatalogModelRecord {
+            scope: "default".to_string(),
+            slug: slug.to_string(),
+            display_name: slug.to_string(),
+            source_kind: "remote".to_string(),
+            user_edited: false,
+            description: None,
+            default_reasoning_level: None,
+            shell_type: None,
+            visibility: Some("list".to_string()),
+            supported_in_api: Some(true),
+            priority: Some(0),
+            availability_nux_json: None,
+            upgrade_json: None,
+            base_instructions: None,
+            model_messages_json: None,
+            supports_reasoning_summaries: None,
+            default_reasoning_summary: None,
+            support_verbosity: None,
+            default_verbosity_json: None,
+            apply_patch_tool_type: None,
+            web_search_tool_type: None,
+            truncation_mode: None,
+            truncation_limit: None,
+            truncation_extra_json: None,
+            supports_parallel_tool_calls: None,
+            supports_image_detail_original: None,
+            context_window: None,
+            auto_compact_token_limit: None,
+            effective_context_window_percent: None,
+            minimal_client_version_json: None,
+            supports_search_tool: None,
+            extra_json: "{}".to_string(),
+            sort_index: 0,
+            updated_at: now,
+        }])
+        .expect("seed catalog model");
+}
+
 fn insert_test_request_log(
     key_id: &str,
     trace_id: &str,
@@ -379,6 +445,7 @@ fn wallet_charge_uses_model_group_billing_model_override() {
     set_distribution_enabled(true).expect("enable distribution");
     let user = create_test_member("member-model-group-billing", Some(1_000_000));
     let key_id = create_owned_test_api_key(&user.id, "member model group key", "gpt-5-mini");
+    seed_test_catalog_model("gpt-5-mini");
     let storage = storage_helpers::open_storage().expect("open storage");
     let group_id = storage
         .default_model_group_id()
