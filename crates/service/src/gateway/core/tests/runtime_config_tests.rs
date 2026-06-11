@@ -149,7 +149,7 @@ fn reload_from_env_defaults_keep_request_gate_legacy_unbounded() {
     );
     assert!(request_compression_enabled());
     assert!(codex_image_generation_enabled());
-    assert!(codex_image_generation_auto_inject_tool_enabled());
+    assert!(!codex_image_generation_auto_inject_tool_enabled());
     assert_eq!(current_codex_image_main_model(), "gpt-5.4-mini");
     assert_eq!(current_codex_image_tool_model(), "gpt-image-2");
 }

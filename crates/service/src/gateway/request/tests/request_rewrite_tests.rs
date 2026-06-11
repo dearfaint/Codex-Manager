@@ -29,6 +29,16 @@ impl RuntimeEnvGuard {
             previous_value,
         }
     }
+
+    fn clear(name: &'static str) -> Self {
+        let previous_value = std::env::var(name).ok();
+        std::env::remove_var(name);
+        crate::gateway::reload_runtime_config_from_env();
+        Self {
+            name,
+            previous_value,
+        }
+    }
 }
 
 impl Drop for RuntimeEnvGuard {
@@ -568,6 +578,28 @@ fn responses_default_path_auto_injects_image_generation_tool_for_codex_backend()
     assert_eq!(tools[0]["type"], "image_generation");
     assert_eq!(tools[0]["output_format"], "png");
     assert!(tools[0].get("model").is_none());
+}
+
+#[test]
+fn responses_default_path_does_not_auto_inject_image_generation_tool_by_default() {
+    let _guard = crate::test_env_guard();
+    let _inject_guard = RuntimeEnvGuard::clear(CODEX_IMAGE_GENERATION_AUTO_INJECT_TOOL_ENV);
+    let body = json!({
+        "model": "gpt-5.4",
+        "input": "帮我生成一个现场作业中台 logo",
+        "stream": true
+    });
+
+    let out = apply_request_overrides(
+        "/v1/responses",
+        serde_json::to_vec(&body).expect("serialize request body"),
+        None,
+        None,
+        Some("https://chatgpt.com/backend-api/codex"),
+    );
+
+    let value: serde_json::Value = serde_json::from_slice(&out).expect("parse output body");
+    assert!(value.get("tools").is_none());
 }
 
 #[test]

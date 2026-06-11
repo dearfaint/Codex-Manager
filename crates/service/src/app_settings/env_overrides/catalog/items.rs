@@ -81,7 +81,7 @@ pub(crate) const ENV_OVERRIDE_CATALOG: &[EnvOverrideCatalogItem] = &[
         "Codex 图片 Tool 自动注入",
         ENV_OVERRIDE_SCOPE_SERVICE,
         ENV_OVERRIDE_APPLY_MODE_RUNTIME,
-        "1",
+        "0",
     ),
     EnvOverrideCatalogItem::new(
         "CODEXMANAGER_CODEX_IMAGE_GENERATION_ENABLED",
