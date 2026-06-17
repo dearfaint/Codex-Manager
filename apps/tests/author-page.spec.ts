@@ -98,7 +98,10 @@ const SETTINGS_SNAPSHOT = {
   appearancePreset: "classic",
 };
 
-async function mockRuntimeAndRpc(page: Page) {
+async function mockRuntimeAndRpc(
+  page: Page,
+  authorContentMode: "success" | "empty" | "failure" = "success",
+) {
   await page.route(/\/api\/runtime(?:\?.*)?$/, async (route) => {
     await route.fulfill({
       contentType: "application/json; charset=utf-8",
@@ -117,32 +120,48 @@ async function mockRuntimeAndRpc(page: Page) {
   });
 
   await page.route(REMOTE_AUTHOR_CONTENT_URL, async (route) => {
+    if (authorContentMode === "failure") {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json; charset=utf-8",
+        body: JSON.stringify({ error: "author content unavailable" }),
+      });
+      return;
+    }
+
     await route.fulfill({
       contentType: "application/json; charset=utf-8",
-      body: JSON.stringify({
-        authorSponsors: [
-          {
-            key: "remote-sponsor",
-            name: "远程赞助商",
-            description: "从独立管理站返回的赞助内容。",
-            href: "https://example.com/sponsor",
-            imageSrc: "https://example.com/sponsor.png",
-            imageAlt: "远程赞助商",
-            actionLabel: "立即查看",
-          },
-        ],
-        authorServerRecommendations: [
-          {
-            key: "remote-server",
-            name: "远程服务器推荐",
-            description: "从独立管理站返回的服务器推荐内容。",
-            href: "https://example.com/server",
-            imageSrc: "https://example.com/server.png",
-            imageAlt: "远程服务器推荐",
-            actionLabel: "查看套餐",
-          },
-        ],
-      }),
+      body: JSON.stringify(
+        authorContentMode === "empty"
+          ? {
+              authorSponsors: [],
+              authorServerRecommendations: [],
+            }
+          : {
+              authorSponsors: [
+                {
+                  key: "remote-sponsor",
+                  name: "远程赞助商",
+                  description: "从独立管理站返回的赞助内容。",
+                  href: "https://example.com/sponsor",
+                  imageSrc: "https://example.com/sponsor.png",
+                  imageAlt: "远程赞助商",
+                  actionLabel: "立即查看",
+                },
+              ],
+              authorServerRecommendations: [
+                {
+                  key: "remote-server",
+                  name: "远程服务器推荐",
+                  description: "从独立管理站返回的服务器推荐内容。",
+                  href: "https://example.com/server",
+                  imageSrc: "https://example.com/server.png",
+                  imageAlt: "远程服务器推荐",
+                  actionLabel: "查看套餐",
+                },
+              ],
+            },
+      ),
     });
   });
 
@@ -220,4 +239,29 @@ test("author page splits sponsor content and contact content into two tabs", asy
   await expect(page.getByRole("heading", { name: "联系作者" })).toBeVisible();
   await expect(page.getByText("ProsperGao", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "加入 TG 群聊" })).toBeVisible();
+});
+
+test("author page does not fall back to configured sponsor placeholders", async ({
+  page,
+}) => {
+  await mockRuntimeAndRpc(page, "failure");
+
+  await page.goto("/author/");
+
+  await expect(page.getByText("暂无内容")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "AI夏末 AIXiamo" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "VisionCoder" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "RackNerd" })).toHaveCount(0);
+});
+
+test("author page shows an empty state when remote author content is empty", async ({
+  page,
+}) => {
+  await mockRuntimeAndRpc(page, "empty");
+
+  await page.goto("/author/");
+
+  await expect(page.getByText("暂无内容")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "赞助商" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "服务器推荐" })).toHaveCount(0);
 });

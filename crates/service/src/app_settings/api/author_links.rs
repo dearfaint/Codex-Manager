@@ -23,68 +23,12 @@ fn trim_optional_text(value: Option<String>) -> Option<String> {
         .filter(|item| !item.is_empty())
 }
 
-fn author_link_item(
-    key: &str,
-    name: &str,
-    description: &str,
-    href: &str,
-    action_label: &str,
-    image_src: Option<&str>,
-    image_alt: Option<&str>,
-) -> AuthorLinkItem {
-    AuthorLinkItem {
-        key: key.to_string(),
-        name: name.to_string(),
-        description: description.to_string(),
-        href: href.to_string(),
-        action_label: action_label.to_string(),
-        image_src: image_src.map(ToString::to_string),
-        image_alt: image_alt.map(ToString::to_string),
-    }
-}
-
 pub(super) fn default_author_sponsors() -> Vec<AuthorLinkItem> {
-    vec![
-        author_link_item(
-            "aixiamo",
-            "AI夏末 AIXiamo",
-            "AIXiamo 面向 Codex CLI、Claude Code、Gemini CLI 等开发者场景，提供 ChatGPT Pro 5x / 20x、ChatGPT Plus、Claude Max、Gemini Pro、Grok 等 AI 会员开通与售后协助服务。支持支付宝 / 微信支付、自动充值、订单可查、教程说明与售后协助，适合需要稳定使用 AI 编程、代码生成、文档处理和高频对话的开发者用户。",
-            "https://www.aixiamo.com/?utm_source=github&utm_medium=sponsor&utm_campaign=codex_manager",
-            "查看服务",
-            Some("/sponsors/aixiamo.jpg"),
-            Some("AI夏末 AIXiamo"),
-        ),
-        author_link_item(
-            "visioncoder",
-            "VisionCoder",
-            "VisionCoder 是一款高颜值、可灵活切换模型的桌面 AI 编程工具。它支持 Claude、Gemini、GPT，并集成 Claude Code、Gemini CLI、Codex、OpenCode 等多种 CLI 能力。",
-            "https://coder.visioncoder.cn",
-            "访问官网",
-            Some("https://coder.visioncoder.cn/logo.png"),
-            Some("VisionCoder"),
-        ),
-        author_link_item(
-            "xingsiyan",
-            "星思研中转站",
-            "星思研中转站为 Claude Code、Codex、Gemini 等模型调用场景提供稳定中转与配套服务，适合需要高可用接口、便捷接入和持续交付支持的开发者与团队。",
-            "https://gzxsy.vip/register?aff=eapz",
-            "立即注册",
-            Some("/sponsors/xingsiyan.jpg"),
-            Some("星思研中转站"),
-        ),
-    ]
+    Vec::new()
 }
 
 pub(super) fn default_author_server_recommendations() -> Vec<AuthorLinkItem> {
-    vec![author_link_item(
-        "racknerd",
-        "RackNerd",
-        "适合部署 CodexManager、网关转发服务和常规开发环境的 VPS 选择，适合需要稳定海外节点和可控成本的个人开发者或小团队。",
-        "https://my.racknerd.com/aff.php?aff=19058",
-        "查看套餐",
-        Some("https://racknerd.com/banners/125x125.gif"),
-        Some("RackNerd Square Banner"),
-    )]
+    Vec::new()
 }
 
 pub(super) fn normalize_author_link_items(items: Vec<AuthorLinkItem>) -> Vec<AuthorLinkItem> {

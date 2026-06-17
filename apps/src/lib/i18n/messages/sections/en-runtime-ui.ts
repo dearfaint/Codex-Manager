@@ -31,6 +31,7 @@ export const EN_RUNTIME_UI_MESSAGES: MessageCatalog = {
   "这里集中展示 README 里的赞助信息、推荐服务，以及作者联系入口。":
     "This page gathers sponsorship information, recommended services, and author contact entry points from the README.",
   赞助商: "Sponsor",
+  暂无内容: "No content yet",
   "沿用 README 的展示内容，并同步星思研邀请链接。":
     "Uses the README presentation and keeps the XingSiyan invitation link in sync.",
   服务器推荐: "Server recommendation",

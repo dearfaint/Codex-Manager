@@ -1420,6 +1420,7 @@ export const EN_MESSAGES: MessageCatalog = {
     "This page brings together sponsor information from the README, recommended services, and author contact options.",
   "赞助商": "Sponsors",
   "赞助商列表": "Sponsor list",
+  "暂无内容": "No content yet",
   "沿用 README 的展示内容，并同步星思研邀请链接。":
     "Reuse the sponsor content from the README and sync the Xing Si Yan referral link.",
   "这里维护 /author 页的赞助商内容。部署在服务器上的 codexmanager-web 会从服务器数据库读取这些内容，无需重新发版本。":

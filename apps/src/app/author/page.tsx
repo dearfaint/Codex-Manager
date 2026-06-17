@@ -34,6 +34,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+type AuthorContentState = {
+  authorSponsors: SponsorLinkItem[];
+  authorServerRecommendations: SponsorLinkItem[];
+};
+
 const AUTHOR_WECHAT_ID = "ProsperGao";
 const AUTHOR_TELEGRAM_GROUP_URL = "https://t.me/+OdpFa9GvjxhjMDhl";
 const FALLBACK_AUTHOR_CONTENT_API =
@@ -190,14 +195,24 @@ function PartnerTableRow({
   );
 }
 
+function EmptyAuthorContent({ translate }: { translate: (message: string) => string }) {
+  return (
+    <Card className="glass-card shadow-sm">
+      <CardContent className="py-12 text-center">
+        <p className="text-sm text-muted-foreground">{translate("暂无内容")}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AuthorPage() {
   const { t } = useI18n();
   const { authorContentUrl } = useRuntimeCapabilities();
   const contentUrl = authorContentUrl || FALLBACK_AUTHOR_CONTENT_API;
-  const [authorContent, setAuthorContent] = useState<{
-    authorSponsors: SponsorLinkItem[];
-    authorServerRecommendations: SponsorLinkItem[];
-  } | null>(null);
+  const [authorContent, setAuthorContent] = useState<AuthorContentState>({
+    authorSponsors: [],
+    authorServerRecommendations: [],
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -220,7 +235,13 @@ export default function AuthorPage() {
             ),
           });
         })
-        .catch(() => undefined);
+        .catch(() => {
+          if (cancelled) return;
+          setAuthorContent({
+            authorSponsors: [],
+            authorServerRecommendations: [],
+          });
+        });
     };
 
     loadContent();
@@ -232,9 +253,11 @@ export default function AuthorPage() {
     };
   }, [contentUrl]);
 
-  const visibleSponsors = authorContent?.authorSponsors ?? [];
+  const visibleSponsors = authorContent.authorSponsors;
   const visibleServerRecommendations =
-    authorContent?.authorServerRecommendations ?? [];
+    authorContent.authorServerRecommendations;
+  const hasAuthorContent =
+    visibleSponsors.length > 0 || visibleServerRecommendations.length > 0;
 
   const handleOpenLink = async (url: string) => {
     try {
@@ -276,6 +299,8 @@ export default function AuthorPage() {
         </TabsList>
 
         <TabsContent value="sponsor" className="space-y-6">
+          {!hasAuthorContent ? <EmptyAuthorContent translate={t} /> : null}
+
           {visibleSponsors.length > 0 ? (
             <Card className="glass-card shadow-sm">
               <CardHeader className="gap-3">
