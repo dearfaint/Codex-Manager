@@ -46,6 +46,15 @@ fn author_link_item(
 pub(super) fn default_author_sponsors() -> Vec<AuthorLinkItem> {
     vec![
         author_link_item(
+            "aixiamo",
+            "AI夏末 AIXiamo",
+            "AIXiamo 面向 Codex CLI、Claude Code、Gemini CLI 等开发者场景，提供 ChatGPT Pro 5x / 20x、ChatGPT Plus、Claude Max、Gemini Pro、Grok 等 AI 会员开通与售后协助服务。支持支付宝 / 微信支付、自动充值、订单可查、教程说明与售后协助，适合需要稳定使用 AI 编程、代码生成、文档处理和高频对话的开发者用户。",
+            "https://www.aixiamo.com/?utm_source=github&utm_medium=sponsor&utm_campaign=codex_manager",
+            "查看服务",
+            Some("/sponsors/aixiamo.jpg"),
+            Some("AI夏末 AIXiamo"),
+        ),
+        author_link_item(
             "visioncoder",
             "VisionCoder",
             "VisionCoder 是一款高颜值、可灵活切换模型的桌面 AI 编程工具。它支持 Claude、Gemini、GPT，并集成 Claude Code、Gemini CLI、Codex、OpenCode 等多种 CLI 能力。",

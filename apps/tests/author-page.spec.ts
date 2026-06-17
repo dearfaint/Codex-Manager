@@ -31,6 +31,16 @@ const SETTINGS_SNAPSHOT = {
   pluginMarketSourceUrl: "",
   authorSponsors: [
     {
+      key: "aixiamo",
+      name: "AI夏末 AIXiamo",
+      description:
+        "AIXiamo 面向 Codex CLI、Claude Code、Gemini CLI 等开发者场景，提供 ChatGPT Pro 5x / 20x、ChatGPT Plus、Claude Max、Gemini Pro、Grok 等 AI 会员开通与售后协助服务。支持支付宝 / 微信支付、自动充值、订单可查、教程说明与售后协助，适合需要稳定使用 AI 编程、代码生成、文档处理和高频对话的开发者用户。",
+      href: "https://www.aixiamo.com/?utm_source=github&utm_medium=sponsor&utm_campaign=codex_manager",
+      imageSrc: "/sponsors/aixiamo.jpg",
+      imageAlt: "AI夏末 AIXiamo",
+      actionLabel: "查看服务",
+    },
+    {
       key: "visioncoder",
       name: "VisionCoder",
       description:

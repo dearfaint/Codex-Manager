@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,6 +54,7 @@ const AUTHOR_SUPPORT_IMAGES = [
 ] as const;
 
 const AUTHOR_PARTNER_IMAGE_BY_KEY: Record<string, string> = {
+  aixiamo: "/sponsors/aixiamo.jpg",
   xingsiyan: "/sponsors/xingsiyan.jpg",
   racknerd: "/sponsors/racknerd.gif",
 };
@@ -74,57 +75,118 @@ function PartnerTable({
       <Table className="min-w-full">
         <TableBody>
           {items.map((item, index) => (
-            <TableRow
+            <PartnerTableRow
               key={item.key}
-              className={index === 0 ? "border-b-0" : ""}
-            >
-              <TableCell className="w-[180px] p-5 align-middle">
-                <div className="flex items-center justify-center rounded-xl border border-border/50 bg-white/95 p-4">
-                  {AUTHOR_PARTNER_IMAGE_BY_KEY[item.key] || item.imageSrc ? (
-                    <img
-                      src={AUTHOR_PARTNER_IMAGE_BY_KEY[item.key] || item.imageSrc}
-                      alt={translate(item.imageAlt ?? item.name)}
-                      className="max-h-20 w-auto object-contain"
-                    />
-                  ) : (
-                    <div className="flex h-20 w-full max-w-[180px] items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 via-background to-primary/5 px-4 text-center">
-                      <span className="text-lg font-semibold tracking-tight text-foreground">
-                        {translate(emptyVisualLabel)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell className="p-5 align-middle">
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <h3 className="text-base font-semibold text-foreground">
-                      {translate(item.name)}
-                    </h3>
-                    <p className="text-sm leading-7 text-muted-foreground">
-                      {translate(item.description)}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        void onOpenLink(item.href);
-                      }}
-                      className="rounded-full"
-                    >
-                      {translate(item.actionLabel)}
-                      <ExternalLink data-icon="inline-end" />
-                    </Button>
-                  </div>
-                </div>
-              </TableCell>
-            </TableRow>
+              item={item}
+              isFirst={index === 0}
+              onOpenLink={onOpenLink}
+              translate={translate}
+              emptyVisualLabel={emptyVisualLabel}
+            />
           ))}
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+function PartnerLogo({
+  item,
+  translate,
+  emptyVisualLabel,
+}: {
+  item: SponsorLinkItem;
+  translate: (message: string) => string;
+  emptyVisualLabel: string;
+}) {
+  const imageSrc = AUTHOR_PARTNER_IMAGE_BY_KEY[item.key] || item.imageSrc;
+  const [imageFailed, setImageFailed] = useState(false);
+  const fallbackLabel = translate(
+    item.imageAlt ?? (item.name || emptyVisualLabel),
+  );
+
+  if (imageSrc && !imageFailed) {
+    return (
+      <img
+        src={imageSrc}
+        alt={fallbackLabel}
+        className="max-h-20 w-auto object-contain"
+        onError={() => setImageFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-20 w-full max-w-[180px] items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 via-background to-primary/5 px-4 text-center">
+      <span className="text-sm font-semibold leading-5 tracking-tight text-foreground">
+        {fallbackLabel}
+      </span>
+    </div>
+  );
+}
+
+function PartnerTableRow({
+  item,
+  isFirst,
+  onOpenLink,
+  translate,
+  emptyVisualLabel,
+}: {
+  item: SponsorLinkItem;
+  isFirst: boolean;
+  onOpenLink: (url: string) => Promise<void>;
+  translate: (message: string) => string;
+  emptyVisualLabel: string;
+}) {
+  const translatedName = translate(item.name);
+  const descriptionLines = useMemo(
+    () =>
+      translate(item.description)
+        .split(/\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean),
+    [item.description, translate],
+  );
+
+  return (
+    <TableRow className={isFirst ? "border-b-0" : ""}>
+      <TableCell className="w-[180px] p-5 align-middle">
+        <div className="flex items-center justify-center rounded-xl border border-border/50 bg-white/95 p-4">
+          <PartnerLogo
+            item={item}
+            translate={translate}
+            emptyVisualLabel={emptyVisualLabel}
+          />
+        </div>
+      </TableCell>
+      <TableCell className="p-5 align-middle">
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold text-foreground">
+              {translatedName}
+            </h3>
+            <div className="space-y-2 text-sm leading-7 text-muted-foreground">
+              {descriptionLines.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                void onOpenLink(item.href);
+              }}
+              className="rounded-full"
+            >
+              {translate(item.actionLabel)}
+              <ExternalLink data-icon="inline-end" />
+            </Button>
+          </div>
+        </div>
+      </TableCell>
+    </TableRow>
   );
 }
 
