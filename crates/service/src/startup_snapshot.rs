@@ -35,6 +35,7 @@ pub(crate) fn read_startup_snapshot(
     day_start_ts: Option<i64>,
     day_end_ts: Option<i64>,
     include_api_models: bool,
+    include_api_keys: bool,
     include_account_details: bool,
 ) -> Result<StartupSnapshotResult, String> {
     let request_log_limit = normalize_startup_request_log_limit(request_log_limit);
@@ -70,7 +71,11 @@ pub(crate) fn read_startup_snapshot(
         .into_iter()
         .map(crate::usage_read::usage_snapshot_result_from_record)
         .collect();
-    let api_keys = apikey_list::read_api_keys_with_storage(&storage)?;
+    let api_keys = if include_api_keys {
+        apikey_list::read_api_keys_with_storage(&storage)?
+    } else {
+        Vec::new()
+    };
     let api_models = if include_api_models {
         apikey_models::read_model_options_from_storage(&storage)?
     } else {
@@ -104,6 +109,7 @@ pub(crate) fn read_startup_snapshot_for_actor(
     day_start_ts: Option<i64>,
     day_end_ts: Option<i64>,
     include_api_models: bool,
+    include_api_keys: bool,
     include_account_details: bool,
 ) -> Result<StartupSnapshotResult, String> {
     if actor.is_admin() {
@@ -112,6 +118,7 @@ pub(crate) fn read_startup_snapshot_for_actor(
             day_start_ts,
             day_end_ts,
             include_api_models,
+            include_api_keys,
             include_account_details,
         );
     }
@@ -125,7 +132,11 @@ pub(crate) fn read_startup_snapshot_for_actor(
     let key_ids = storage
         .list_api_key_ids_for_user(user_id)
         .map_err(|err| format!("list api key ids for user failed: {err}"))?;
-    let api_keys = apikey_list::read_api_keys_for_ids_with_storage(&storage, &key_ids)?;
+    let api_keys = if include_api_keys {
+        apikey_list::read_api_keys_for_ids_with_storage(&storage, &key_ids)?
+    } else {
+        Vec::new()
+    };
     let api_models = if include_api_models {
         apikey_models::read_model_options_from_storage(&storage)?
     } else {

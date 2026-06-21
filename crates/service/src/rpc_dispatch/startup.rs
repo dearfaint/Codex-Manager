@@ -21,6 +21,7 @@ pub(super) fn try_handle(req: &JsonRpcRequest, actor: &RpcActor) -> Option<JsonR
             let day_start_ts = super::i64_param(req, "dayStartTs");
             let day_end_ts = super::i64_param(req, "dayEndTs");
             let include_api_models = super::bool_param(req, "includeApiModels").unwrap_or(true);
+            let include_api_keys = super::bool_param(req, "includeApiKeys").unwrap_or(true);
             let include_account_details =
                 super::bool_param(req, "includeAccountDetails").unwrap_or(true);
             super::value_or_error(startup_snapshot::read_startup_snapshot_for_actor(
@@ -29,6 +30,7 @@ pub(super) fn try_handle(req: &JsonRpcRequest, actor: &RpcActor) -> Option<JsonR
                 day_start_ts,
                 day_end_ts,
                 include_api_models,
+                include_api_keys,
                 include_account_details,
             ))
         }

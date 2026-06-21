@@ -670,6 +670,40 @@ fn startup_snapshot_can_skip_account_details_for_light_dashboard_reads() {
 }
 
 #[test]
+fn startup_snapshot_can_skip_api_keys_for_light_dashboard_reads() {
+    let _guard = test_env_guard();
+    let db_path = setup_dashboard_test_db("codexmanager-startup-snapshot-api-key-light");
+    let user = create_test_member("startup-api-key-light", None);
+    let key_id = create_owned_test_api_key(&user.id, "startup light key", "gpt-5-mini");
+
+    let full_resp = response_result(handle_request_with_actor(
+        rpc_request("startup/snapshot", serde_json::json!({})),
+        RpcActor::system_admin(),
+    ));
+    assert!(
+        full_resp.result["apiKeys"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|item| item["id"] == key_id)),
+        "{:?}",
+        full_resp.result
+    );
+
+    let light_resp = response_result(handle_request_with_actor(
+        rpc_request(
+            "startup/snapshot",
+            serde_json::json!({ "includeApiKeys": false }),
+        ),
+        RpcActor::system_admin(),
+    ));
+    assert_eq!(
+        light_resp.result["apiKeys"].as_array().map(Vec::len),
+        Some(0)
+    );
+
+    let _ = std::fs::remove_file(db_path);
+}
+
+#[test]
 fn request_log_summary_reuses_filtered_count_for_all_status() {
     let _guard = test_env_guard();
     let db_path = setup_dashboard_test_db("codexmanager-requestlog-summary-count");

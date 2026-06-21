@@ -22,6 +22,7 @@ interface UseDashboardStatsOptions {
   requestLogLimit?: number;
   includeAccountHints?: boolean;
   includeApiModels?: boolean;
+  includeApiKeys?: boolean;
   includeAccountDetails?: boolean;
 }
 
@@ -48,6 +49,7 @@ export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
     options.requestLogLimit ?? STARTUP_SNAPSHOT_REQUEST_LOG_LIMIT;
   const includeAccountHints = options.includeAccountHints ?? true;
   const includeApiModels = options.includeApiModels ?? true;
+  const includeApiKeys = options.includeApiKeys ?? true;
   const includeAccountDetails = options.includeAccountDetails ?? true;
   const isSnapshotQueryEnabled = useDeferredDesktopActivation(
     isServiceReady && isPageActive,
@@ -69,6 +71,7 @@ export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
       localDayRange.dayStartTs,
       localDayRange.dayEndTs,
       includeApiModels,
+      includeApiKeys,
       includeAccountDetails,
     ),
     queryFn: () =>
@@ -77,6 +80,7 @@ export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
         dayStartTs: localDayRange.dayStartTs,
         dayEndTs: localDayRange.dayEndTs,
         includeApiModels,
+        includeApiKeys,
         includeAccountDetails,
       }),
     enabled: isSnapshotQueryEnabled,
