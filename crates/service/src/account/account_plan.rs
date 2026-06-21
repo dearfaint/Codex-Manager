@@ -157,6 +157,10 @@ pub(crate) fn token_plan_from_token(token: &Token) -> AccountTokenPlan {
     }
 }
 
+pub(crate) fn resolve_token_account_plan(token: &Token) -> Option<ResolvedAccountPlan> {
+    resolve_account_plan(Some(&token_plan_from_token(token)), None)
+}
+
 pub(crate) fn normalize_account_plan_value(value: &str) -> Option<String> {
     normalize_plan_type(value).map(|plan| plan.normalized)
 }
@@ -700,6 +704,35 @@ mod tests {
         let token_plan = super::token_plan_from_token(&token);
         let resolved = resolve_account_plan(Some(&token_plan), Some(&usage)).expect("resolve plan");
         assert_eq!(resolved.normalized, "plus");
+    }
+
+    #[test]
+    fn resolve_token_account_plan_reads_token_claim_without_usage_snapshot() {
+        let token = Token {
+            account_id: "acc-go".to_string(),
+            id_token: "header.payload.sig".to_string(),
+            access_token: {
+                let header = encode_base64url(br#"{"alg":"none","typ":"JWT"}"#);
+                let payload = encode_base64url(
+                    serde_json::json!({
+                        "sub": "acc-go",
+                        "https://api.openai.com/auth": {
+                            "chatgpt_plan_type": "go"
+                        }
+                    })
+                    .to_string()
+                    .as_bytes(),
+                );
+                format!("{header}.{payload}.sig")
+            },
+            refresh_token: "refresh".to_string(),
+            api_key_access_token: None,
+            last_refresh: now_ts(),
+        };
+
+        let resolved = super::resolve_token_account_plan(&token).expect("resolve token plan");
+
+        assert_eq!(resolved.normalized, "go");
     }
 
     #[test]

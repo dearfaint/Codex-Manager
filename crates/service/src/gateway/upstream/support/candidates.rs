@@ -137,6 +137,10 @@ pub(in super::super) fn allow_openai_fallback_for_account(
     account: &Account,
     token: &Token,
 ) -> bool {
+    if let Some(plan) = crate::account_plan::resolve_token_account_plan(token) {
+        return matches!(plan.normalized.as_str(), "free" | "go" | "plus" | "pro");
+    }
+
     let snapshot = storage
         .latest_usage_snapshot_for_account(account.id.as_str())
         .ok()
