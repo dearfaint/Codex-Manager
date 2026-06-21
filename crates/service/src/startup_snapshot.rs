@@ -31,6 +31,7 @@ pub(crate) fn read_startup_snapshot(
     request_log_limit: Option<i64>,
     day_start_ts: Option<i64>,
     day_end_ts: Option<i64>,
+    include_api_models: bool,
 ) -> Result<StartupSnapshotResult, String> {
     let request_log_limit = normalize_startup_request_log_limit(request_log_limit);
     let storage =
@@ -61,7 +62,11 @@ pub(crate) fn read_startup_snapshot(
         .map(crate::usage_read::usage_snapshot_result_from_record)
         .collect();
     let api_keys = apikey_list::read_api_keys_with_storage(&storage)?;
-    let api_models = apikey_models::read_model_options_from_storage(&storage)?;
+    let api_models = if include_api_models {
+        apikey_models::read_model_options_from_storage(&storage)?
+    } else {
+        Default::default()
+    };
     let manual_preferred_account_id = gateway::manual_preferred_account();
     let request_log_today_summary =
         requestlog_today_summary::read_requestlog_today_summary_with_storage(
@@ -89,9 +94,15 @@ pub(crate) fn read_startup_snapshot_for_actor(
     request_log_limit: Option<i64>,
     day_start_ts: Option<i64>,
     day_end_ts: Option<i64>,
+    include_api_models: bool,
 ) -> Result<StartupSnapshotResult, String> {
     if actor.is_admin() {
-        return read_startup_snapshot(request_log_limit, day_start_ts, day_end_ts);
+        return read_startup_snapshot(
+            request_log_limit,
+            day_start_ts,
+            day_end_ts,
+            include_api_models,
+        );
     }
     let request_log_limit = normalize_startup_request_log_limit(request_log_limit);
     let user_id = actor
@@ -104,7 +115,11 @@ pub(crate) fn read_startup_snapshot_for_actor(
         .list_api_key_ids_for_user(user_id)
         .map_err(|err| format!("list api key ids for user failed: {err}"))?;
     let api_keys = apikey_list::read_api_keys_for_ids_with_storage(&storage, &key_ids)?;
-    let api_models = apikey_models::read_model_options_from_storage(&storage)?;
+    let api_models = if include_api_models {
+        apikey_models::read_model_options_from_storage(&storage)?
+    } else {
+        Default::default()
+    };
     let request_log_today_summary =
         requestlog_today_summary::read_requestlog_today_summary_for_key_ids_with_storage(
             &storage,

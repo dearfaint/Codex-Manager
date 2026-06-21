@@ -21,6 +21,7 @@ interface UseDashboardStatsOptions {
   forceActive?: boolean;
   requestLogLimit?: number;
   includeAccountHints?: boolean;
+  includeApiModels?: boolean;
 }
 
 /**
@@ -45,6 +46,7 @@ export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
   const requestLogLimit =
     options.requestLogLimit ?? STARTUP_SNAPSHOT_REQUEST_LOG_LIMIT;
   const includeAccountHints = options.includeAccountHints ?? true;
+  const includeApiModels = options.includeApiModels ?? true;
   const isSnapshotQueryEnabled = useDeferredDesktopActivation(
     isServiceReady && isPageActive,
   );
@@ -63,12 +65,14 @@ export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
       serviceStatus.addr,
       requestLogLimit,
       localDayRange.dayStartTs,
+      includeApiModels,
     ),
     queryFn: () =>
       serviceClient.getStartupSnapshot({
         requestLogLimit,
         dayStartTs: localDayRange.dayStartTs,
         dayEndTs: localDayRange.dayEndTs,
+        includeApiModels,
       }),
     enabled: isSnapshotQueryEnabled,
     retry: 1,

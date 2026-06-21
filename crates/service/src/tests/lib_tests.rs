@@ -535,6 +535,41 @@ fn seed_test_catalog_model(slug: &str) {
         .expect("seed catalog model");
 }
 
+#[test]
+fn startup_snapshot_can_skip_api_model_catalog_for_light_dashboard_reads() {
+    let _guard = test_env_guard();
+    let db_path = setup_dashboard_test_db("codexmanager-startup-snapshot-light");
+    seed_test_catalog_model("gpt-startup-heavy");
+
+    let full_resp = response_result(handle_request_with_actor(
+        rpc_request("startup/snapshot", serde_json::json!({})),
+        RpcActor::system_admin(),
+    ));
+    assert!(
+        full_resp.result["apiModels"]["models"]
+            .as_array()
+            .is_some_and(|items| !items.is_empty()),
+        "{:?}",
+        full_resp.result
+    );
+
+    let light_resp = response_result(handle_request_with_actor(
+        rpc_request(
+            "startup/snapshot",
+            serde_json::json!({ "includeApiModels": false }),
+        ),
+        RpcActor::system_admin(),
+    ));
+    assert_eq!(
+        light_resp.result["apiModels"]["models"]
+            .as_array()
+            .map(Vec::len),
+        Some(0)
+    );
+
+    let _ = std::fs::remove_file(db_path);
+}
+
 fn insert_test_request_log(
     key_id: &str,
     trace_id: &str,

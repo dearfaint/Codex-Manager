@@ -25,8 +25,15 @@ export function buildStartupSnapshotQueryKey(
   addr: string | null | undefined,
   requestLogLimit = STARTUP_SNAPSHOT_REQUEST_LOG_LIMIT,
   dayStartTs?: number | null,
+  includeApiModels = true,
 ) {
-  return ["startup-snapshot", addr || null, requestLogLimit, dayStartTs || null] as const;
+  return [
+    "startup-snapshot",
+    addr || null,
+    requestLogLimit,
+    dayStartTs || null,
+    includeApiModels,
+  ] as const;
 }
 
 /**

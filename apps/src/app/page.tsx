@@ -870,6 +870,7 @@ function AdminDashboard() {
   const { stats, isLoading, isServiceReady } = useDashboardStats({
     requestLogLimit: 0,
     includeAccountHints: false,
+    includeApiModels: false,
   });
   const { isDirectAccountMode } = useCodexProfileModeStatus({
     enabled: true,
