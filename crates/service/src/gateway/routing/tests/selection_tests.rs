@@ -201,6 +201,104 @@ fn candidates_follow_account_sort_order() {
     super::reload_from_env();
 }
 
+#[test]
+fn collect_candidates_patches_identity_without_rewriting_account_row() {
+    let _guard = crate::test_env_guard();
+    let previous_ttl = std::env::var(CANDIDATE_CACHE_TTL_ENV).ok();
+    let previous_db_path = std::env::var("CODEXMANAGER_DB_PATH").ok();
+    std::env::set_var(CANDIDATE_CACHE_TTL_ENV, "0");
+    std::env::set_var(
+        "CODEXMANAGER_DB_PATH",
+        isolated_test_db_path("selection-identity-patch-test"),
+    );
+    super::reload_from_env();
+    clear_candidate_cache_for_tests();
+
+    let storage = Storage::open_in_memory().expect("open");
+    storage.init().expect("init");
+    let now = now_ts();
+    let created_at = now.saturating_sub(100);
+    storage
+        .insert_account(&Account {
+            id: "acc-identity-candidate".to_string(),
+            label: "keep label".to_string(),
+            issuer: "keep issuer".to_string(),
+            chatgpt_account_id: None,
+            workspace_id: None,
+            group_name: Some("keep group".to_string()),
+            sort: 37,
+            status: "active".to_string(),
+            created_at,
+            updated_at: now.saturating_sub(50),
+        })
+        .expect("insert account");
+    storage
+        .insert_token(&Token {
+            account_id: "acc-identity-candidate".to_string(),
+            id_token: "e30.eyJ3b3Jrc3BhY2VfaWQiOiJ3b3Jrc3BhY2UtY2FuZGlkYXRlIiwiaHR0cHM6Ly9hcGkub3BlbmFpLmNvbS9hdXRoIjp7ImNoYXRncHRfYWNjb3VudF9pZCI6ImNoYXRncHQtY2FuZGlkYXRlIn19.sig".to_string(),
+            access_token: String::new(),
+            refresh_token: "refresh".to_string(),
+            api_key_access_token: None,
+            last_refresh: now,
+        })
+        .expect("insert token");
+    storage
+        .insert_usage_snapshot(&UsageSnapshotRecord {
+            account_id: "acc-identity-candidate".to_string(),
+            used_percent: Some(10.0),
+            window_minutes: Some(300),
+            resets_at: None,
+            secondary_used_percent: None,
+            secondary_window_minutes: None,
+            secondary_resets_at: None,
+            credits_json: None,
+            captured_at: now,
+        })
+        .expect("insert snapshot");
+
+    let candidates = collect_gateway_candidates(&storage).expect("collect candidates");
+
+    assert_eq!(candidates.len(), 1);
+    let candidate = &candidates[0].0;
+    assert_eq!(
+        candidate.chatgpt_account_id.as_deref(),
+        Some("chatgpt-candidate")
+    );
+    assert_eq!(
+        candidate.workspace_id.as_deref(),
+        Some("workspace-candidate")
+    );
+
+    let updated = storage
+        .find_account_by_id("acc-identity-candidate")
+        .expect("find account")
+        .expect("account exists");
+    assert_eq!(updated.label, "keep label");
+    assert_eq!(updated.issuer, "keep issuer");
+    assert_eq!(updated.group_name.as_deref(), Some("keep group"));
+    assert_eq!(updated.sort, 37);
+    assert_eq!(updated.status, "active");
+    assert_eq!(updated.created_at, created_at);
+    assert_eq!(
+        updated.chatgpt_account_id.as_deref(),
+        Some("chatgpt-candidate")
+    );
+    assert_eq!(updated.workspace_id.as_deref(), Some("workspace-candidate"));
+
+    clear_candidate_cache_for_tests();
+    if let Some(value) = previous_ttl {
+        std::env::set_var(CANDIDATE_CACHE_TTL_ENV, value);
+    } else {
+        std::env::remove_var(CANDIDATE_CACHE_TTL_ENV);
+    }
+    if let Some(value) = previous_db_path {
+        std::env::set_var("CODEXMANAGER_DB_PATH", value);
+    } else {
+        std::env::remove_var("CODEXMANAGER_DB_PATH");
+    }
+    super::reload_from_env();
+}
+
 /// 函数 `gateway_error_status_change_invalidates_candidate_snapshot_cache`
 ///
 /// 作者: gaohongshun

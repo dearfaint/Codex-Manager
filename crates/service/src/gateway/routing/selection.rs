@@ -155,7 +155,12 @@ fn collect_gateway_candidates_uncached(
         let (chatgpt_account_id, workspace_id) = derive_account_meta(&token);
         if patch_account_meta_in_place(&mut candidate_account, chatgpt_account_id, workspace_id) {
             candidate_account.updated_at = now_ts();
-            let _ = storage.insert_account(&candidate_account);
+            let _ = storage.update_account_workspace_identity(
+                &candidate_account.id,
+                candidate_account.chatgpt_account_id.as_deref(),
+                candidate_account.workspace_id.as_deref(),
+                candidate_account.updated_at,
+            );
         }
         out.push((candidate_account, token));
     }
