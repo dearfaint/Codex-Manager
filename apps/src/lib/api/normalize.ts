@@ -352,6 +352,22 @@ export function normalizeUsageAggregateSummary(payload: unknown): UsageAggregate
   };
 }
 
+function normalizeStartupAccountSummary(payload: unknown) {
+  const source = asObject(payload);
+  return {
+    accountCount: asInteger(source.accountCount ?? source.account_count, 0, 0),
+    availableCount: asInteger(source.availableCount ?? source.available_count, 0, 0),
+    lowQuotaCount: asInteger(source.lowQuotaCount ?? source.low_quota_count, 0, 0),
+    primaryRemainPercent: toNullableNumber(
+      source.primaryRemainPercent ?? source.primary_remain_percent
+    ),
+    secondaryRemainPercent: toNullableNumber(
+      source.secondaryRemainPercent ?? source.secondary_remain_percent
+    ),
+    lastRefreshedAt: toNullableNumber(source.lastRefreshedAt ?? source.last_refreshed_at),
+  };
+}
+
 /**
  * 函数 `normalizeTodaySummary`
  *
@@ -1889,6 +1905,7 @@ export function normalizeStartupSnapshot(payload: unknown): StartupSnapshot {
 
   return {
     accounts,
+    accountSummary: normalizeStartupAccountSummary(source.accountSummary ?? source.account_summary),
     usageSnapshots,
     usageAggregateSummary: normalizeUsageAggregateSummary(source.usageAggregateSummary),
     apiKeys: normalizeApiKeyList(source.apiKeys),

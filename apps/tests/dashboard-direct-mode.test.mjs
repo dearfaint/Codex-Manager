@@ -57,3 +57,20 @@ test("首页仪表盘不再为已移除的活跃账号卡片预取日志样本",
   assert.match(source, /useDashboardStats\(\{\s*requestLogLimit: 0,\s*includeAccountHints: false,/s);
   assert.match(source, /includeApiModels: false,\s*includeApiKeys: false,\s*includeAccountRuntime: false,\s*includeAccountDetails: false,/s);
 });
+
+test("首页账户统计优先使用启动快照汇总", async () => {
+  const hookSource = await readSource("src/hooks/useDashboardStats.ts");
+  assert.match(hookSource, /const accountSummary = data\?\.accountSummary;/);
+  assert.match(
+    hookSource,
+    /const totalAccounts = accountSummary\?\.accountCount \?\? accounts\.length;/,
+  );
+  assert.match(
+    hookSource,
+    /accountSummary\?\.availableCount \?\? accounts\.filter\(\(item\) => item\.isAvailable\)\.length;/,
+  );
+
+  const normalizeSource = await readSource("src/lib/api/normalize.ts");
+  assert.match(normalizeSource, /function normalizeStartupAccountSummary/);
+  assert.match(normalizeSource, /accountSummary: normalizeStartupAccountSummary/);
+});

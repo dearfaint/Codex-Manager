@@ -1,6 +1,8 @@
 use codexmanager_core::{
-    rpc::types::{StartupSnapshotResult, UsageAggregateSummaryResult},
-    storage::AccountSummaryStorageSnapshotOptions,
+    rpc::types::{
+        QuotaOpenAiAccountOverviewResult, StartupSnapshotResult, UsageAggregateSummaryResult,
+    },
+    storage::{AccountQuotaOverviewStats, AccountSummaryStorageSnapshotOptions},
 };
 
 use crate::{
@@ -51,6 +53,10 @@ pub(crate) fn read_startup_snapshot(
         db_path,
         accounts.len()
     );
+    let account_summary = storage
+        .account_quota_overview_stats()
+        .map(startup_account_summary)
+        .map_err(|err| format!("read startup account summary failed: {err}"))?;
     let account_ids = accounts
         .iter()
         .map(|account| account.id.clone())
@@ -99,6 +105,7 @@ pub(crate) fn read_startup_snapshot(
 
     Ok(StartupSnapshotResult {
         accounts: account_context.items,
+        account_summary,
         usage_snapshots,
         usage_aggregate_summary,
         api_keys,
@@ -166,6 +173,7 @@ pub(crate) fn read_startup_snapshot_for_actor(
 
     Ok(StartupSnapshotResult {
         accounts: Vec::new(),
+        account_summary: QuotaOpenAiAccountOverviewResult::default(),
         usage_snapshots: Vec::new(),
         usage_aggregate_summary: UsageAggregateSummaryResult::default(),
         api_keys,
@@ -174,6 +182,21 @@ pub(crate) fn read_startup_snapshot_for_actor(
         request_log_today_summary,
         request_logs,
     })
+}
+
+fn startup_account_summary(stats: AccountQuotaOverviewStats) -> QuotaOpenAiAccountOverviewResult {
+    QuotaOpenAiAccountOverviewResult {
+        account_count: stats.account_count,
+        available_count: stats.available_count,
+        low_quota_count: stats.low_quota_count,
+        primary_remain_percent: stats
+            .primary_remain_percent_avg
+            .map(|value| value.round() as i64),
+        secondary_remain_percent: stats
+            .secondary_remain_percent_avg
+            .map(|value| value.round() as i64),
+        last_refreshed_at: stats.last_refreshed_at,
+    }
 }
 
 #[cfg(test)]

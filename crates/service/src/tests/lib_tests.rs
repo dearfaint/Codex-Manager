@@ -782,6 +782,14 @@ fn startup_snapshot_can_skip_account_runtime_for_light_dashboard_reads() {
         light_resp.result["usageAggregateSummary"]["primaryKnownCount"].as_i64(),
         Some(1)
     );
+    assert_eq!(
+        light_resp.result["accountSummary"]["accountCount"].as_i64(),
+        Some(1)
+    );
+    assert_eq!(
+        light_resp.result["accountSummary"]["primaryRemainPercent"].as_i64(),
+        Some(80)
+    );
 
     let _ = std::fs::remove_file(db_path);
 }
