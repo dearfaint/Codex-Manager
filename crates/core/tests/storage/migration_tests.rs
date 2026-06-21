@@ -369,6 +369,7 @@ fn init_tracks_schema_migrations_and_is_idempotent() {
         "103_app_project_user_lookup_indexes",
         "104_billing_rules_owner_lookup_indexes",
         "105_redeem_records_lookup_indexes",
+        "106_account_manager_created_by_lookup_indexes",
     ] {
         let applied: i64 = storage
             .conn

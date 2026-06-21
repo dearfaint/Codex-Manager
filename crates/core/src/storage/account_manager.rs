@@ -1093,6 +1093,9 @@ impl Storage {
         self.conn.execute_batch(include_str!(
             "../../migrations/105_redeem_records_lookup_indexes.sql"
         ))?;
+        self.conn.execute_batch(include_str!(
+            "../../migrations/106_account_manager_created_by_lookup_indexes.sql"
+        ))?;
         Ok(())
     }
 }
@@ -1252,6 +1255,29 @@ mod tests {
             assert!(
                 plan.contains(expected_index),
                 "expected redeem record foreign-key path to use {expected_index}, got {plan}"
+            );
+        }
+    }
+
+    #[test]
+    fn created_by_user_delete_paths_use_lookup_indexes() {
+        let storage = Storage::open_in_memory().expect("open storage");
+        storage.init().expect("init storage");
+
+        for (sql, expected_index) in [
+            (
+                "EXPLAIN QUERY PLAN UPDATE app_wallet_ledger_entries SET created_by_user_id = NULL WHERE created_by_user_id = 'user-1'",
+                "idx_app_wallet_ledger_created_by_lookup",
+            ),
+            (
+                "EXPLAIN QUERY PLAN UPDATE redeem_code_batches SET created_by_user_id = NULL WHERE created_by_user_id = 'user-1'",
+                "idx_redeem_code_batches_created_by_lookup",
+            ),
+        ] {
+            let plan = collect_query_plan(&storage, sql);
+            assert!(
+                plan.contains(expected_index),
+                "expected created-by user delete path to use {expected_index}, got {plan}"
             );
         }
     }
