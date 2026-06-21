@@ -428,9 +428,8 @@ pub(crate) fn read_member_dashboard_summary(
     let api_key_summary = build_api_key_summary(&api_keys);
     let wallet = read_member_wallet(&storage, &user_id)?;
 
-    let today_usage_rollup = storage
-        .summarize_request_token_stats_for_user_between(&user_id, day_start, day_end)
-        .map_err(|err| format!("summarize member token usage failed: {err}"))?;
+    let usage_trend = read_usage_trend_7d(&storage, &user_id, day_start, day_end)?;
+    let today_usage_rollup = usage_trend.today_usage;
     let usage_today = MemberDashboardUsageToday {
         input_tokens: today_usage_rollup.input_tokens,
         cached_input_tokens: today_usage_rollup.cached_input_tokens,
@@ -446,7 +445,6 @@ pub(crate) fn read_member_dashboard_summary(
         }),
     };
 
-    let usage_trend_7d = read_usage_trend_7d(&storage, &user_id, day_start, day_end)?;
     let (top_keys, top_models) =
         read_member_usage_breakdown(&storage, &api_keys, &key_ids, day_start, day_end)?;
     let available_model_count = read_available_model_count(&storage)?;
@@ -481,7 +479,7 @@ pub(crate) fn read_member_dashboard_summary(
         wallet,
         api_key_summary,
         usage_today,
-        usage_trend_7d,
+        usage_trend_7d: usage_trend.points,
         top_keys,
         top_models,
         available_models: Vec::new(),
@@ -572,21 +570,29 @@ fn build_api_key_summary(api_keys: &[ApiKeySummary]) -> MemberDashboardApiKeySum
     }
 }
 
+#[derive(Debug, Clone, Default)]
+struct MemberUsageTrend {
+    today_usage: TokenUsageRollup,
+    points: Vec<MemberDashboardUsagePoint>,
+}
+
 fn read_usage_trend_7d(
     storage: &codexmanager_core::storage::Storage,
     user_id: &str,
     day_start: i64,
     day_end: i64,
-) -> Result<Vec<MemberDashboardUsagePoint>, String> {
+) -> Result<MemberUsageTrend, String> {
     let day_span = (day_end - day_start).max(1);
     let range_start = day_start.saturating_sub((TREND_DAYS - 1) * day_span);
     let items = storage
         .summarize_request_token_stats_daily_for_user(user_id, range_start, day_end, day_span)
         .map_err(|err| format!("summarize member token trend failed: {err}"))?;
     let mut by_start = items
-        .into_iter()
+        .iter()
+        .cloned()
         .map(|item| (item.day_start_ts, item.usage))
         .collect::<BTreeMap<_, _>>();
+    let today_usage = daily_usage_bucket(&items, day_start, day_end).unwrap_or_default();
     let mut points = Vec::new();
     for offset in (0..TREND_DAYS).rev() {
         let start = day_start.saturating_sub(offset * day_span);
@@ -599,7 +605,10 @@ fn read_usage_trend_7d(
             estimated_cost_usd: usage.estimated_cost_usd.max(0.0),
         });
     }
-    Ok(points)
+    Ok(MemberUsageTrend {
+        today_usage,
+        points,
+    })
 }
 
 fn read_member_usage_breakdown(
@@ -774,7 +783,8 @@ fn build_alerts(
 mod tests {
     use super::{
         build_dashboard_source_summaries, build_dashboard_user_summaries, daily_usage_bucket,
-        dashboard_source_ids, filter_source_usage, read_member_usage_breakdown, SourceMetadata,
+        dashboard_source_ids, filter_source_usage, read_member_usage_breakdown,
+        read_usage_trend_7d, SourceMetadata,
     };
     use codexmanager_core::storage::{
         ApiKey, ApiKeyOwner, AppUser, DailyTokenUsageRollup, RequestTokenStat,
@@ -1060,5 +1070,58 @@ mod tests {
 
         assert!(top_keys.is_empty());
         assert!(top_models.is_empty());
+    }
+
+    #[test]
+    fn member_usage_trend_reuses_today_rollup() {
+        let storage = Storage::open_in_memory().expect("open storage");
+        storage.init().expect("init storage");
+        storage
+            .insert_app_user(&AppUser {
+                id: "user-member-trend".to_string(),
+                username: "member-trend@example.com".to_string(),
+                display_name: None,
+                password_hash: "hash".to_string(),
+                role: "member".to_string(),
+                status: "active".to_string(),
+                created_at: 1,
+                updated_at: 1,
+                last_login_at: None,
+            })
+            .expect("insert user");
+        storage
+            .insert_api_key(&api_key("key-member-trend"))
+            .expect("insert api key");
+        storage
+            .upsert_api_key_owner(&ApiKeyOwner {
+                key_id: "key-member-trend".to_string(),
+                owner_kind: "user".to_string(),
+                owner_user_id: Some("user-member-trend".to_string()),
+                project_id: None,
+                updated_at: 1,
+            })
+            .expect("seed owner");
+        storage
+            .insert_request_token_stat(&RequestTokenStat {
+                request_log_id: 7_001,
+                key_id: Some("key-member-trend".to_string()),
+                model: Some("gpt-test".to_string()),
+                total_tokens: Some(42),
+                estimated_cost_usd: Some(0.42),
+                created_at: 1_700_000_120,
+                ..RequestTokenStat::default()
+            })
+            .expect("insert token stat");
+
+        let trend =
+            read_usage_trend_7d(&storage, "user-member-trend", 1_700_000_000, 1_700_086_400)
+                .expect("read trend");
+
+        assert_eq!(trend.today_usage.total_tokens, 42);
+        assert_eq!(trend.points.len(), super::TREND_DAYS as usize);
+        assert_eq!(
+            trend.points.last().map(|point| point.total_tokens),
+            Some(42)
+        );
     }
 }
