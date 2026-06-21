@@ -1090,6 +1090,9 @@ impl Storage {
         self.conn.execute_batch(include_str!(
             "../../migrations/104_billing_rules_owner_lookup_indexes.sql"
         ))?;
+        self.conn.execute_batch(include_str!(
+            "../../migrations/105_redeem_records_lookup_indexes.sql"
+        ))?;
         Ok(())
     }
 }
@@ -1222,6 +1225,33 @@ mod tests {
             assert!(
                 plan.contains(expected_index),
                 "expected billing rule delete path to use {expected_index}, got {plan}"
+            );
+        }
+    }
+
+    #[test]
+    fn redeem_record_foreign_key_paths_use_lookup_indexes() {
+        let storage = Storage::open_in_memory().expect("open storage");
+        storage.init().expect("init storage");
+
+        for (sql, expected_index) in [
+            (
+                "EXPLAIN QUERY PLAN DELETE FROM redeem_records WHERE code_id = 'code-1'",
+                "idx_redeem_records_code_lookup",
+            ),
+            (
+                "EXPLAIN QUERY PLAN DELETE FROM redeem_records WHERE wallet_id = 'wallet-1'",
+                "idx_redeem_records_wallet_lookup",
+            ),
+            (
+                "EXPLAIN QUERY PLAN UPDATE redeem_records SET ledger_entry_id = NULL WHERE ledger_entry_id = 'ledger-1'",
+                "idx_redeem_records_ledger_entry_lookup",
+            ),
+        ] {
+            let plan = collect_query_plan(&storage, sql);
+            assert!(
+                plan.contains(expected_index),
+                "expected redeem record foreign-key path to use {expected_index}, got {plan}"
             );
         }
     }
