@@ -109,31 +109,7 @@ impl Storage {
     }
 
     pub fn api_key_quota_overview_stats(&self) -> Result<ApiKeyQuotaOverviewStats> {
-        let sql = format!(
-            "{key_usage_cte}
-             SELECT
-                COUNT(k.id) AS key_count,
-                IFNULL(SUM(CASE WHEN q.quota_limit_tokens > 0 THEN 1 ELSE 0 END), 0) AS limited_key_count,
-                IFNULL(SUM(CASE WHEN q.quota_limit_tokens > 0 THEN q.quota_limit_tokens ELSE 0 END), 0) AS total_limit_tokens,
-                IFNULL(SUM(IFNULL(u.used_tokens, 0)), 0) AS total_used_tokens,
-                IFNULL(
-                    SUM(
-                        CASE
-                            WHEN q.quota_limit_tokens > 0 THEN
-                                MAX(q.quota_limit_tokens - IFNULL(u.used_tokens, 0), 0)
-                            ELSE 0
-                        END
-                    ),
-                    0
-                ) AS total_remaining_tokens,
-                IFNULL(SUM(IFNULL(u.estimated_cost_usd, 0.0)), 0.0) AS estimated_cost_usd
-             FROM api_keys k
-             LEFT JOIN api_key_quota_limits q
-               ON q.key_id = k.id
-              AND q.quota_limit_tokens > 0
-             LEFT JOIN key_usage u ON u.key_id = k.id",
-            key_usage_cte = api_key_usage_cte_sql(true, ApiKeyUsageScope::AllKeys),
-        );
+        let sql = api_key_quota_overview_stats_sql();
         self.conn.query_row(&sql, [], |row| {
             Ok(ApiKeyQuotaOverviewStats {
                 key_count: row.get(0)?,
@@ -232,6 +208,34 @@ fn api_key_remaining_quota_tokens_sql() -> String {
          LEFT JOIN key_usage u ON u.key_id = q.key_id
          WHERE q.quota_limit_tokens > 0",
         key_usage_cte = api_key_usage_cte_sql(false, ApiKeyUsageScope::LimitedQuotaKeys),
+    )
+}
+
+fn api_key_quota_overview_stats_sql() -> String {
+    format!(
+        "{key_usage_cte}
+         SELECT
+            COUNT(k.id) AS key_count,
+            IFNULL(SUM(CASE WHEN q.quota_limit_tokens > 0 THEN 1 ELSE 0 END), 0) AS limited_key_count,
+            IFNULL(SUM(CASE WHEN q.quota_limit_tokens > 0 THEN q.quota_limit_tokens ELSE 0 END), 0) AS total_limit_tokens,
+            IFNULL(SUM(IFNULL(u.used_tokens, 0)), 0) AS total_used_tokens,
+            IFNULL(
+                SUM(
+                    CASE
+                        WHEN q.quota_limit_tokens > 0 THEN
+                            MAX(q.quota_limit_tokens - IFNULL(u.used_tokens, 0), 0)
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS total_remaining_tokens,
+            IFNULL(SUM(IFNULL(u.estimated_cost_usd, 0.0)), 0.0) AS estimated_cost_usd
+         FROM api_keys k
+         LEFT JOIN api_key_quota_limits q
+           ON q.key_id = k.id
+          AND q.quota_limit_tokens > 0
+         LEFT JOIN key_usage u ON u.key_id = k.id",
+        key_usage_cte = api_key_usage_cte_sql(true, ApiKeyUsageScope::AllKeys),
     )
 }
 
@@ -431,6 +435,34 @@ mod tests {
             }),
             "expected limited-key legacy rollup lookup by key index, got {details:?}"
         );
+    }
+
+    #[test]
+    fn api_key_quota_overview_stats_reads_key_and_usage_tables_directly() {
+        let storage = Storage::open_in_memory().expect("open");
+        storage.init().expect("init");
+        let sql = format!("EXPLAIN QUERY PLAN {}", api_key_quota_overview_stats_sql());
+
+        let details = collect_query_plan_details(&storage, &sql);
+
+        assert!(
+            details
+                .iter()
+                .any(|detail| detail.contains("scan k") || detail.contains("scan api_keys")),
+            "expected quota overview to scan api keys directly, got {details:?}"
+        );
+        assert!(
+            details
+                .iter()
+                .any(|detail| detail.contains("sqlite_autoindex_api_key_quota_limits_1")),
+            "expected quota overview to join quota limits by primary key, got {details:?}"
+        );
+        for alias in ["scan s", "scan h", "scan r"] {
+            assert!(
+                details.iter().any(|detail| detail.contains(alias)),
+                "expected quota overview to aggregate token usage source {alias}, got {details:?}"
+            );
+        }
     }
 
     #[test]

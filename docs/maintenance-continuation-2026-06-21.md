@@ -5560,3 +5560,35 @@
   - No SQLite migration or new index was added; this slice centralizes existing overview SQL and guards the existing latest-usage index path.
   - No feature removal was attempted; no current safe-removal proof was found.
   - Goal remains active after this slice.
+
+## 2026-06-22 tail marker - API key quota overview SQL helper
+
+- Latest completed slice in this continuation:
+  - Continued quota storage scan after account quota overview SQL helper slice.
+  - Confirmed `api_key_quota_overview_stats(...)` is used by quota overview reads and still kept its all-key usage aggregation SQL inline.
+  - File touched: `crates/core/src/storage/api_key_quota_limits.rs`.
+  - Added storage-local SQL helper:
+    - `api_key_quota_overview_stats_sql()`
+  - Updated production method `api_key_quota_overview_stats(...)` to use the helper while preserving key count, limited-key count, total limit, used, remaining, and estimated cost semantics.
+  - Added EXPLAIN coverage in `api_key_quota_overview_stats_reads_key_and_usage_tables_directly` to verify the helper-backed overview query scans API keys directly, joins quota limits by primary key, and aggregates raw/hourly/legacy token usage tables.
+- Validation:
+  - `cargo test -p codexmanager-core api_key_quota_overview_stats_reads_key_and_usage_tables_directly -- --nocapture` passed:
+    - 1 matching core library test.
+  - `cargo test -p codexmanager-core api_key_quota_overview_stats_sums_limits_after_live_hourly_and_legacy_usage -- --nocapture` passed:
+    - 1 matching core library test.
+  - `cargo fmt --check` passed.
+  - `cargo test -p codexmanager-core api_key_quota -- --nocapture` passed:
+    - 8 matching core library tests.
+    - 1 matching storage integration test.
+  - `cargo test -p codexmanager-core` passed:
+    - 339 core library tests.
+    - 7 auth integration tests.
+    - 29 storage integration tests.
+    - 1 usage integration test.
+    - 1 version integration test.
+    - doc-tests with 0 tests.
+- Notes:
+  - No SQLite migration or new index was added; the all-key overview intentionally aggregates all usage sources, while limited-key remaining quota remains covered by existing scoped lookup tests.
+  - No feature removal was attempted; no current safe-removal proof was found.
+  - Client reuse scan in this slice did not find a new production path repeatedly constructing stable upstream clients.
+  - Goal remains active after this slice.
