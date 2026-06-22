@@ -6188,3 +6188,22 @@
   - No SQLite migration or new index was added; existing model price rule query-plan assertions were preserved unchanged in the moved test file.
   - No feature removal was attempted in this slice.
   - Goal remains active after this slice.
+## 2026-06-22 continuation - api key quota limits storage tests module split
+
+- Latest completed slice in this continuation:
+  - Continued the core storage modularity scan after splitting model price rule tests.
+  - Reconfirmed `crates/core/src/storage/api_key_quota_limits.rs` as a storage module with an EOF `#[cfg(test)] mod tests` block containing pure API key quota test code.
+  - Files touched:
+    - `crates/core/src/storage/api_key_quota_limits.rs`
+    - `crates/core/src/storage/api_key_quota_limits_tests.rs`
+  - Moved the inline API key quota/query-plan tests into `api_key_quota_limits_tests.rs` and left the parent module with `#[path = "api_key_quota_limits_tests.rs"] mod tests;`.
+  - No API key quota production logic or SQL text was changed; tests remain a child module and still access private helpers through `super`.
+- Validation passed so far:
+  - `cargo fmt` passed after the split.
+  - `cargo test -p codexmanager-core api_key_quota_limits -- --nocapture` passed: 6 matching core library tests.
+  - `cargo fmt --check` passed.
+  - `git diff --check` passed with only LF-to-CRLF warnings and exit code 0.
+- Notes:
+  - No SQLite migration or new index was added; existing API key quota query-plan assertions were preserved unchanged in the moved test file.
+  - No feature removal was attempted in this slice.
+  - Goal remains active after this slice.
