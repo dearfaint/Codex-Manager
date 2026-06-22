@@ -6074,3 +6074,22 @@
   - No SQLite migration or new index was added; existing model catalog query-plan assertions were preserved unchanged in the moved test file.
   - No feature removal was attempted in this slice.
   - Goal remains active after this slice.
+## 2026-06-22 continuation - model sources storage tests module split
+
+- Latest completed slice in this continuation:
+  - Continued the core storage modularity scan after splitting model options storage tests.
+  - Reconfirmed `crates/core/src/storage/model_sources.rs` as a large model source storage module and found its EOF `#[cfg(test)] mod tests` block was pure test code.
+  - Files touched:
+    - `crates/core/src/storage/model_sources.rs`
+    - `crates/core/src/storage/model_sources_tests.rs`
+  - Moved the inline model source/query-plan tests into `model_sources_tests.rs` and left the parent module with `#[path = "model_sources_tests.rs"] mod tests;`.
+  - No model source production logic or SQL text was changed; tests remain a child module and still access private helpers through `super`.
+- Validation passed so far:
+  - `cargo fmt` passed after the split.
+  - `cargo test -p codexmanager-core model_sources -- --nocapture` passed: 6 matching core library tests.
+  - `cargo fmt --check` passed.
+  - `git diff --check` passed with only LF-to-CRLF warnings and exit code 0.
+- Notes:
+  - No SQLite migration or new index was added; existing model source query-plan assertions were preserved unchanged in the moved test file.
+  - No feature removal was attempted in this slice.
+  - Goal remains active after this slice.
