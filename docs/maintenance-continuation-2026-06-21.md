@@ -6289,3 +6289,23 @@
   - No SQLite migration or new index was added in this service-layer test split.
   - No feature removal was attempted in this slice.
   - Goal remains active after this slice.
+
+## 2026-06-22 continuation - quota read service tests module split
+
+- Latest completed slice in this continuation:
+  - Continued service-layer modularity after splitting dashboard service tests.
+  - Reconfirmed `crates/service/src/quota/read.rs` had one EOF `#[cfg(test)] mod tests` block containing quota read, billing rule validation, source assignment, and model pool tests.
+  - Files touched:
+    - `crates/service/src/quota/read.rs`
+    - `crates/service/src/quota/read_tests.rs`
+  - Moved the EOF quota read tests into `read_tests.rs` and left the parent module with `#[path = "read_tests.rs"] mod tests;`.
+  - Kept the existing standalone `#[cfg(test)] fn build_model_pool_accumulators_from_storage` helper in `read.rs`, because it is a test-only helper used by the moved child module and is not part of the EOF test block.
+  - No quota read production logic, SQL text, SQLite migration, index, or request-routing behavior was changed.
+- Validation passed for this slice:
+  - `cargo fmt` passed.
+  - `cargo test -p codexmanager-service quota::read -- --nocapture` passed: 15 matching service library tests.
+  - `cargo fmt --check` passed.
+  - `git diff --check` passed with only LF-to-CRLF warnings and exit code 0.
+- Notes:
+  - No feature removal was attempted in this slice.
+  - Goal remains active after this slice.
