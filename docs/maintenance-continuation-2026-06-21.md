@@ -5838,3 +5838,26 @@
   - No SQLite migration or new index was added; this is a maintainability-only helper extraction for an existing count query.
   - No feature removal was attempted; no current safe-removal proof was found.
   - Goal remains active after this slice.
+
+## 2026-06-22 continuation - request rewrite multipart module split
+
+- Latest completed slice in this continuation:
+  - Continued the service/gateway modularity scan after core storage helper work.
+  - Re-scanned `crates/service/src/gateway/request/request_rewrite.rs`, which already had `request_rewrite_chat_completions.rs` and `request_rewrite_shared.rs` submodules but still kept low-level multipart form-data parsing and rebuilding inline.
+  - Files touched:
+    - `crates/service/src/gateway/request/request_rewrite.rs`
+    - `crates/service/src/gateway/request/request_rewrite_multipart.rs`
+  - Added `request_rewrite_multipart.rs` and moved the low-level multipart helpers into it:
+    - `find_subsequence`
+    - `extract_multipart_part_name`
+    - `filter_multipart_form_data_body`
+  - Updated the request rewrite path to call `multipart::filter_multipart_form_data_body(...)`, leaving JSON/urlencoded rewrite flow and request override wrappers in the main module.
+- Validation passed so far:
+  - `cargo test -p codexmanager-service request_rewrite -- --nocapture` passed: 62 matching service library tests.
+  - `cargo fmt` was run after the split to normalize the new module.
+  - `cargo fmt --check` passed.
+  - `git diff --check` passed.
+- Notes:
+  - No behavior change or feature removal was intended; this is a module-boundary cleanup for the request rewrite surface.
+  - No SQLite migration or new index was involved in this service-layer slice.
+  - Goal remains active after this slice.
