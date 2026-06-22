@@ -125,6 +125,15 @@ fn model_catalog_string_items_for_kinds_sql(placeholders: &str) -> String {
     )
 }
 
+fn count_available_model_catalog_models_sql() -> String {
+    format!(
+        "SELECT COUNT(1)
+         FROM model_catalog_models
+         WHERE scope = ?1
+           AND {MODEL_CATALOG_API_AVAILABLE_CONDITION}"
+    )
+}
+
 fn delete_model_catalog_model_sql() -> &'static str {
     "DELETE FROM model_catalog_models WHERE scope = ?1 AND slug = ?2"
 }
@@ -558,12 +567,7 @@ impl Storage {
     }
 
     pub fn count_available_model_catalog_models(&self, scope: &str) -> rusqlite::Result<i64> {
-        let sql = format!(
-            "SELECT COUNT(1)
-             FROM model_catalog_models
-             WHERE scope = ?1
-               AND {MODEL_CATALOG_API_AVAILABLE_CONDITION}"
-        );
+        let sql = count_available_model_catalog_models_sql();
         self.conn.query_row(&sql, [scope], |row| row.get(0))
     }
 
@@ -1566,6 +1570,19 @@ mod tests {
                 .count_available_model_catalog_models("default")
                 .expect("count models"),
             2
+        );
+
+        let sql = count_available_model_catalog_models_sql();
+        let details = collect_query_plan_details_with_params(
+            &storage,
+            &format!("EXPLAIN QUERY PLAN {sql}"),
+            vec![SqlValue::Text("default".to_string())],
+        );
+        assert!(
+            details
+                .iter()
+                .any(|detail| detail.contains("model_catalog_models") && detail.contains("index")),
+            "available catalog model count should use a model catalog index, got {details:?}"
         );
     }
 

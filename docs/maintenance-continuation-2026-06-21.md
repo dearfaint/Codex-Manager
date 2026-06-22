@@ -5371,3 +5371,36 @@
   - Continue SQLite work only when production SQL/helper/EXPLAIN alignment or a real query-plan issue is visible.
   - Continue client reuse only if a production/request/frequent background path repeatedly constructs a stable-config client.
   - Continue feature removal only with current call-site evidence plus tests proving it is safe.
+## 2026-06-22 tail marker - model catalog available count SQL helper
+
+- Latest completed slice in this continuation:
+  - Scanned `model_options` storage after the model-source platform slug index slice.
+  - Confirmed `count_available_model_catalog_models(...)` is used by `crates/service/src/dashboard.rs` and still built its SQL inline.
+  - File touched: `crates/core/src/storage/model_options.rs`.
+  - Added storage-local SQL helper:
+    - `count_available_model_catalog_models_sql()`
+  - Updated production method `count_available_model_catalog_models(...)` to use the helper while preserving the existing API visibility filters.
+  - Expanded EXPLAIN coverage:
+    - `count_available_model_catalog_models_uses_visibility_and_api_filters` now verifies the available-model count query uses a model catalog index.
+- Validation:
+  - `cargo test -p codexmanager-core count_available_model_catalog_models_uses_visibility_and_api_filters -- --nocapture` passed:
+    - 1 matching core library test.
+  - `cargo fmt --check` passed.
+  - `cargo test -p codexmanager-core model_options -- --nocapture` passed:
+    - 16 matching core library tests.
+  - `cargo test -p codexmanager-core` passed:
+    - 338 core library tests.
+    - 7 auth integration tests.
+    - 29 storage integration tests.
+    - 1 usage integration test.
+    - 1 version integration test.
+    - doc-tests with 0 tests.
+- Notes:
+  - No SQLite migration or new index was added; the inspected count query already uses an existing model catalog index.
+  - No feature removal was attempted; no current safe-removal proof was found.
+  - Upstream HTTP client scan in this slice again found production caches or test-only clients, not a new per-request rebuild path.
+- Next continuation constraints:
+  - Goal remains active.
+  - Continue SQLite work only when production SQL/helper/EXPLAIN alignment or a real query-plan issue is visible.
+  - Continue client reuse only if a production/request/frequent background path repeatedly constructs a stable-config client.
+  - Continue feature removal only with current call-site evidence plus tests proving it is safe.
