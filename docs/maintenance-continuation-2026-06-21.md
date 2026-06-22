@@ -6207,3 +6207,25 @@
   - No SQLite migration or new index was added; existing API key quota query-plan assertions were preserved unchanged in the moved test file.
   - No feature removal was attempted in this slice.
   - Goal remains active after this slice.
+## 2026-06-22 continuation - account sidecar storage tests module split
+
+- Latest completed slice in this continuation:
+  - Continued the core storage modularity scan after splitting API key quota tests.
+  - Reconfirmed `crates/core/src/storage/account_subscriptions.rs` and `crates/core/src/storage/account_metadata.rs` each had EOF `#[cfg(test)] mod tests` blocks containing pure account sidecar storage test code.
+  - Files touched:
+    - `crates/core/src/storage/account_subscriptions.rs`
+    - `crates/core/src/storage/account_subscriptions_tests.rs`
+    - `crates/core/src/storage/account_metadata.rs`
+    - `crates/core/src/storage/account_metadata_tests.rs`
+  - Moved the inline account subscription and account metadata tests into focused sibling test files and left each parent module with `#[path = ...] mod tests;`.
+  - No account subscription or metadata production logic or SQL text was changed; tests remain child modules and still access private helpers through `super`.
+- Validation passed so far:
+  - `cargo fmt` passed after the split.
+  - `cargo test -p codexmanager-core account_subscriptions -- --nocapture` passed: 6 matching core library tests.
+  - `cargo test -p codexmanager-core account_metadata -- --nocapture` passed: 5 matching core library tests and 1 matching storage integration test.
+  - `cargo fmt --check` passed.
+  - `git diff --check` passed with only LF-to-CRLF warnings and exit code 0.
+- Notes:
+  - No SQLite migration or new index was added; existing account sidecar query-plan assertions were preserved unchanged in the moved test files.
+  - No feature removal was attempted in this slice.
+  - Goal remains active after this slice.
