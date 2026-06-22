@@ -5957,3 +5957,20 @@
   - No SQLite migration or new index was added in this service-layer test-module split.
   - No feature removal was attempted; this was a maintainability cleanup.
   - Goal remains active after this slice.
+## 2026-06-22 continuation - responses websocket tests module split
+
+- Latest completed slice in this continuation:
+  - Continued service-layer modularity after splitting protocol request router tests.
+  - Re-scanned `crates/service/src/http/responses_websocket.rs`, which had an EOF inline `#[cfg(test)] mod tests` block for WebSocket request rewriting, proxy headers, terminal event inspection, usage parsing, and retry behavior.
+  - Files touched:
+    - `crates/service/src/http/responses_websocket.rs`
+    - `crates/service/src/http/responses_websocket_tests.rs`
+  - Moved the inline tests into `responses_websocket_tests.rs` and left the parent module with `#[path = "responses_websocket_tests.rs"] mod tests;`.
+  - No WebSocket production logic was changed; tests remain a child module and still access the same private helpers through `super`.
+- Validation passed so far:
+  - `cargo fmt` was run after the split.
+  - `cargo test -p codexmanager-service responses_websocket -- --nocapture` passed: 20 matching service library tests. The filter also covered related proxy runtime WebSocket tests.
+- Notes:
+  - No SQLite migration or new index was added in this service-layer test-module split.
+  - No feature removal was attempted; this was a maintainability cleanup.
+  - Goal remains active after this slice.
