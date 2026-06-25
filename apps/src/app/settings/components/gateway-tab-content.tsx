@@ -32,6 +32,7 @@ export function GatewayTabContent({
   t,
   snapshot,
   updateSettings,
+  onModelCatalogAutoRemoteFetchChange,
   quotaGuardInputValues,
   setQuotaGuardDraft,
   saveQuotaGuardField,
@@ -58,6 +59,7 @@ export function GatewayTabContent({
     mutate: (patch: Partial<AppSettings>) => void;
     mutateAsync: (patch: Partial<AppSettings>) => Promise<unknown>;
   };
+  onModelCatalogAutoRemoteFetchChange: (checked: boolean) => void;
   quotaGuardInputValues: {
     primaryMinRemainingPercent: string;
     secondaryMinRemainingPercent: string;
@@ -144,7 +146,7 @@ export function GatewayTabContent({
           <Switch
             checked={snapshot.modelCatalogAutoRemoteFetch}
             onCheckedChange={(checked) =>
-              updateSettings.mutate({ modelCatalogAutoRemoteFetch: checked })
+              onModelCatalogAutoRemoteFetchChange(checked)
             }
           />
         </div>
