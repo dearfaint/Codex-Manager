@@ -413,6 +413,7 @@ export const KO_MESSAGES: MessageCatalog = {
   模型目录为空: "모델 카탈로그가 비어 있습니다",
   读取密钥失败: "키 읽기 실패",
   累计Token: "누적 Token",
+  累计: "누적",
   当前筛选结果中的总Token: "현재 필터 결과의 총 Token",
   Token: "Token",
   总: "총",

@@ -333,6 +333,8 @@ fn request_log_filter_summary_serialization_uses_camel_case() {
 fn api_key_usage_stat_summary_serialization_uses_camel_case() {
     let result = ApiKeyUsageStatSummary {
         key_id: "gk_test".to_string(),
+        today_tokens: 12,
+        today_estimated_cost_usd: 0.34,
         total_tokens: 123,
         estimated_cost_usd: 4.56,
     };
@@ -341,7 +343,13 @@ fn api_key_usage_stat_summary_serialization_uses_camel_case() {
     let obj = value
         .as_object()
         .expect("api key usage stat summary object");
-    for key in ["keyId", "totalTokens", "estimatedCostUsd"] {
+    for key in [
+        "keyId",
+        "todayTokens",
+        "todayEstimatedCostUsd",
+        "totalTokens",
+        "estimatedCostUsd",
+    ] {
         assert!(obj.contains_key(key), "missing key: {key}");
     }
 }

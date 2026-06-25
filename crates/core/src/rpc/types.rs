@@ -330,6 +330,8 @@ pub struct ApiKeyListResult {
 #[serde(rename_all = "camelCase")]
 pub struct ApiKeyUsageStatSummary {
     pub key_id: String,
+    pub today_tokens: i64,
+    pub today_estimated_cost_usd: f64,
     pub total_tokens: i64,
     pub estimated_cost_usd: f64,
 }

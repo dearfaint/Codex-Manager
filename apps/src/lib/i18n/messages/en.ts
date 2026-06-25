@@ -442,6 +442,7 @@ export const EN_MESSAGES: MessageCatalog = {
   模型目录为空: "The model catalog is empty",
   读取密钥失败: "Failed to read key",
   累计Token: "Total Token",
+  累计: "Total",
   当前筛选结果中的总Token: "Total Token in the current filtered result",
   Token: "Token",
   总: "Total",

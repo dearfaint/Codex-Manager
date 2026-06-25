@@ -1114,6 +1114,17 @@ export function normalizeApiKeyUsageStats(payload: unknown): ApiKeyUsageStat[] {
       if (!keyId) return null;
       return {
         keyId,
+        todayTokens: asInteger(
+          current.todayTokens ?? current.today_tokens,
+          0,
+          0
+        ),
+        todayEstimatedCostUsd: Math.max(
+          0,
+          toNullableNumber(
+            current.todayEstimatedCostUsd ?? current.today_estimated_cost_usd
+          ) ?? 0
+        ),
         totalTokens: asInteger(current.totalTokens ?? current.total_tokens, 0, 0),
         estimatedCostUsd: Math.max(
           0,

@@ -328,6 +328,24 @@ export default function ApiKeysPage() {
         result[keyId] = Math.max(0, item.estimatedCostUsd || 0);
         return result;
       }, {});
+      const todayUsageByKey = stats.reduce<Record<string, number>>(
+        (result, item) => {
+          const keyId = String(item.keyId || "").trim();
+          if (!keyId) return result;
+          result[keyId] = Math.max(0, item.todayTokens || 0);
+          return result;
+        },
+        {},
+      );
+      const todayCostByKey = stats.reduce<Record<string, number>>(
+        (result, item) => {
+          const keyId = String(item.keyId || "").trim();
+          if (!keyId) return result;
+          result[keyId] = Math.max(0, item.todayEstimatedCostUsd || 0);
+          return result;
+        },
+        {},
+      );
 
       const totalTokens = Object.values(usageByKey).reduce(
         (sum, value) => sum + value,
@@ -340,6 +358,8 @@ export default function ApiKeysPage() {
       return {
         usageByKey,
         costByKey,
+        todayUsageByKey,
+        todayCostByKey,
         totalTokens,
         totalCostUsd,
       };
@@ -349,6 +369,8 @@ export default function ApiKeysPage() {
   });
   const usageByKey = usageOverview?.usageByKey || {};
   const costByKey = usageOverview?.costByKey || {};
+  const todayUsageByKey = usageOverview?.todayUsageByKey || {};
+  const todayCostByKey = usageOverview?.todayCostByKey || {};
   const showOverviewLoading =
     isServiceReady && isPageActive && isUsageOverviewLoading;
 
@@ -701,6 +723,8 @@ export default function ApiKeysPage() {
                   const isEnabled = String(key.status).toLowerCase() !== "disabled";
                   const usedTokens = usageByKey[key.id] ?? 0;
                   const usedCostUsd = costByKey[key.id] ?? 0;
+                  const todayUsedTokens = todayUsageByKey[key.id] ?? 0;
+                  const todayUsedCostUsd = todayCostByKey[key.id] ?? 0;
                   const quotaLimitTokens =
                     typeof key.quotaLimitTokens === "number" &&
                     Number.isFinite(key.quotaLimitTokens) &&
@@ -811,36 +835,52 @@ export default function ApiKeysPage() {
                         {formatLocalMinuteFromSeconds(key.lastUsedAt, t("从未调用"))}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        <div className="space-y-1">
-                          <div
-                            className={
-                              isQuotaExhausted
-                                ? "font-semibold text-red-500"
-                                : "text-foreground"
-                            }
-                          >
-                            {formatCompactTokenAmount(usedTokens)}
-                            {quotaLimitTokens !== null ? (
+                        <div className="space-y-1.5">
+                          <div>
+                            <div className="text-[10px] font-normal text-muted-foreground">
+                              {t("今日")}
+                            </div>
+                            <div className="text-foreground">
+                              {formatCompactTokenAmount(todayUsedTokens)}
                               <span className="text-muted-foreground">
-                                {" "}
-                                / {formatCompactTokenAmount(quotaLimitTokens)}
+                                {" "}· {formatQuotaLimitUsd(todayUsedCostUsd)}
                               </span>
-                            ) : null}
+                            </div>
                           </div>
-                          <div className="text-[10px] font-normal text-muted-foreground">
-                            {quotaLimitTokens === null
-                              ? `${t("已花费")} ${formatQuotaLimitUsd(
-                                  usedCostUsd,
-                                )} · ${t("不限额")}`
-                              : isQuotaExhausted
-                                ? `${t("已达上限")} · ${formatQuotaLimitUsd(
+                          <div>
+                            <div className="text-[10px] font-normal text-muted-foreground">
+                              {t("累计")}
+                            </div>
+                            <div
+                              className={
+                                isQuotaExhausted
+                                  ? "font-semibold text-red-500"
+                                  : "text-foreground"
+                              }
+                            >
+                              {formatCompactTokenAmount(usedTokens)}
+                              {quotaLimitTokens !== null ? (
+                                <span className="text-muted-foreground">
+                                  {" "}
+                                  / {formatCompactTokenAmount(quotaLimitTokens)}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="text-[10px] font-normal text-muted-foreground">
+                              {quotaLimitTokens === null
+                                ? `${t("已花费")} ${formatQuotaLimitUsd(
                                     usedCostUsd,
-                                  )} / ${formatQuotaLimitUsd(quotaLimitUsd)}`
-                                : `${t("剩余")} ${formatCompactTokenAmount(
-                                    quotaRemaining,
-                                  )} · ${formatQuotaLimitUsd(
-                                    usedCostUsd,
-                                  )} / ${formatQuotaLimitUsd(quotaLimitUsd)}`}
+                                  )} · ${t("不限额")}`
+                                : isQuotaExhausted
+                                  ? `${t("已达上限")} · ${formatQuotaLimitUsd(
+                                      usedCostUsd,
+                                    )} / ${formatQuotaLimitUsd(quotaLimitUsd)}`
+                                  : `${t("剩余")} ${formatCompactTokenAmount(
+                                      quotaRemaining,
+                                    )} · ${formatQuotaLimitUsd(
+                                      usedCostUsd,
+                                    )} / ${formatQuotaLimitUsd(quotaLimitUsd)}`}
+                            </div>
                           </div>
                         </div>
                       </TableCell>

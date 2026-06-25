@@ -114,6 +114,8 @@ export interface AggregateApiSupplierModelImportResult {
 
 export interface ApiKeyUsageStat {
   keyId: string;
+  todayTokens: number;
+  todayEstimatedCostUsd: number;
   totalTokens: number;
   estimatedCostUsd: number;
 }
