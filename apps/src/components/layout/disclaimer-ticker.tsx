@@ -52,7 +52,7 @@ export function DisclaimerTicker() {
       <Button
         type="button"
         variant="outline"
-        className="group flex h-8 w-full min-w-0 max-w-none items-center gap-2 rounded-md border-0 bg-transparent px-1 py-0 text-left shadow-none transition-colors hover:bg-primary/10"
+        className="group flex h-8 w-full min-w-0 max-w-none items-center gap-1.5 rounded-md border-0 bg-transparent px-1.5 py-0 text-left shadow-none transition-colors hover:bg-primary/10 2xl:gap-2"
         onClick={() => setOpen(true)}
         title={t("免责声明")}
       >
@@ -60,7 +60,7 @@ export function DisclaimerTicker() {
           <ShieldAlert className="h-3 w-3" />
         </div>
         <div className="min-w-0 flex-1 leading-none">
-          <div className="mb-0.5 font-mono text-[10px] font-medium uppercase text-muted-foreground/80">
+          <div className="mb-0.5 font-mono text-[10px] font-medium uppercase text-muted-foreground/80 2xl:hidden">
             {t("免责声明")}
           </div>
           <div className="truncate text-[11px] text-muted-foreground/90">

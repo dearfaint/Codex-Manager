@@ -45,7 +45,7 @@ export function PageWorkspace({ children, className }: PageWorkspaceProps) {
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-[1680px] flex-col gap-5 animate-in fade-in duration-300",
+        "mx-auto flex w-full max-w-[1680px] flex-col gap-4 animate-in fade-in duration-300",
         className,
       )}
     >
@@ -65,41 +65,39 @@ export function PageHeader({
   return (
     <section
       className={cn(
-        "mission-panel glass-card relative overflow-hidden rounded-lg p-4 lg:flex lg:items-end lg:justify-between",
+        "mission-panel glass-card relative overflow-hidden rounded-lg px-4 py-3 lg:flex lg:items-center lg:justify-between",
         className,
       )}
     >
-      <div className="pointer-events-none absolute right-4 top-4 hidden grid-cols-3 gap-1 opacity-25 sm:grid">
+      <div className="pointer-events-none absolute right-3 top-3 hidden grid-cols-3 gap-0.5 opacity-15 sm:grid">
         {Array.from({ length: 9 }).map((_, index) => (
-          <span key={index} className="h-1 w-1 rounded-full bg-primary/50" />
+          <span key={index} className="h-0.5 w-0.5 rounded-full bg-primary/50" />
         ))}
       </div>
-      <div className="relative min-w-0 space-y-3">
-        {eyebrow ? (
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {typeof eyebrow === "string" ? (
-              <Badge variant="secondary" className="h-6 rounded-md border-primary/20 bg-primary/10 px-2.5 font-mono text-[11px] uppercase text-primary">
+      <div className="relative flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="truncate text-xl font-semibold text-foreground">
+            {title}
+          </h1>
+          {eyebrow ? (
+            typeof eyebrow === "string" ? (
+              <Badge variant="secondary" className="h-5 shrink-0 rounded-md border-primary/20 bg-primary/10 px-2 font-mono text-[10px] uppercase text-primary">
                 {eyebrow}
               </Badge>
             ) : (
-              eyebrow
-            )}
-          </div>
-        ) : null}
-        <div className="space-y-1">
-          <h1 className="truncate text-2xl font-semibold text-foreground md:text-3xl">
-            {title}
-          </h1>
-          {description ? (
-            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              {description}
-            </p>
+              <span className="shrink-0">{eyebrow}</span>
+            )
           ) : null}
         </div>
-        {meta ? <div className="flex flex-wrap gap-2">{meta}</div> : null}
+        {description ? (
+          <p className="min-w-[220px] flex-1 truncate text-xs leading-5 text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
+        {meta ? <div className="flex shrink-0 flex-wrap gap-1.5">{meta}</div> : null}
       </div>
       {actions ? (
-        <div className="relative mt-4 flex w-full flex-wrap items-center gap-2 sm:w-auto lg:mt-0 lg:justify-end">
+        <div className="relative mt-3 flex w-full flex-wrap items-center gap-2 sm:w-auto lg:mt-0 lg:ml-4 lg:justify-end">
           {actions}
         </div>
       ) : null}
@@ -122,28 +120,26 @@ export function MetricCard({
         className,
       )}
     >
-      <CardContent className="flex min-h-[116px] items-start justify-between gap-3 p-4">
-        <div className="min-w-0 space-y-2">
-          <p className="truncate font-mono text-[11px] font-semibold uppercase text-muted-foreground">
+      <CardContent className="flex min-h-[52px] items-center justify-between gap-2 px-3 py-2">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold text-muted-foreground">
             {title}
           </p>
-          <div className="truncate font-mono text-3xl font-semibold leading-none tabular-nums text-foreground">
+          <div
+            className="mt-1 truncate font-mono text-xl font-semibold leading-none tabular-nums text-foreground"
+            title={typeof detail === "string" ? detail : undefined}
+          >
             {value}
           </div>
-          {detail ? (
-            <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
-              {detail}
-            </p>
-          ) : null}
         </div>
         {Icon ? (
           <div
             className={cn(
-              "flex h-11 w-11 shrink-0 items-center justify-center rounded-md border",
+              "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border",
               metricToneClassName[tone],
             )}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-3 w-3" />
           </div>
         ) : null}
       </CardContent>

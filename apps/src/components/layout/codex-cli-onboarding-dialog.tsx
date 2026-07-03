@@ -206,26 +206,26 @@ export function CodexCliOnboardingDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         initialFocus={introFocusRef}
-        className="glass-card mission-panel top-[48%] max-h-[84vh] overflow-hidden p-0 sm:!max-w-[90vw] xl:!max-w-[78rem] 2xl:!max-w-[84rem]"
+        className="glass-card mission-panel max-h-[min(82dvh,760px)] overflow-hidden p-0 sm:!max-w-[min(92vw,980px)]"
       >
-        <div className="flex min-h-0 max-h-[84vh] flex-col">
-          <DialogHeader className="shrink-0 border-b border-border/60 px-6 pb-4 pt-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex max-h-[min(82dvh,760px)] min-h-0 flex-col">
+          <DialogHeader className="shrink-0 border-b border-border/60 px-5 py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div
                 ref={introFocusRef}
                 tabIndex={-1}
-                className="max-w-3xl space-y-2 outline-none"
+                className="max-w-2xl select-none space-y-1 outline-none"
               >
-                <DialogTitle className="text-2xl">
+                <DialogTitle className="text-lg font-semibold md:text-xl">
                   {t("Codex 首次接入引导")}
                 </DialogTitle>
-                <DialogDescription className="text-sm leading-7">
+                <DialogDescription className="text-xs leading-5 md:text-sm">
                   {t(
                     "只需要准备 `auth.json` 和 `config.toml` 两个文件。没有勾选“不再显示”时，下次进入软件仍会看到它。",
                   )}
                 </DialogDescription>
               </div>
-              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm leading-6 text-muted-foreground lg:max-w-sm">
+              <div className="rounded-md border border-border/60 bg-background/50 px-3 py-2 text-xs leading-5 text-muted-foreground lg:max-w-xs">
                 {t(
                   "右侧只保留基础配置；复制后按实际端口改 `base_url` 即可。",
                 )}
@@ -235,11 +235,11 @@ export function CodexCliOnboardingDialog({
 
           <div
             ref={scrollContainerRef}
-            className="grid min-h-0 gap-5 overflow-y-auto px-6 py-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)]"
+            className="grid min-h-0 flex-1 gap-3 overflow-y-auto px-5 py-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.86fr)]"
           >
-            <div className="space-y-5">
-              <section className="rounded-xl border border-border/60 bg-background/45 p-5 shadow-sm">
-                <div className="flex flex-col gap-4 border-b border-border/50 pb-4">
+            <div className="min-h-0 space-y-3">
+              <section className="rounded-md border border-border/60 bg-background/45 p-4 shadow-sm">
+                <div className="flex flex-col gap-3 border-b border-border/50 pb-3">
                   <div className="space-y-1">
                     <h3 className="text-base font-semibold leading-7 text-foreground">
                       {t("基础步骤")}
@@ -254,7 +254,7 @@ export function CodexCliOnboardingDialog({
                       {t("按顺序完成这三项即可。")}
                     </p>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="grid gap-2 md:grid-cols-3">
                     {GUIDE_STEPS.map((step, index) => (
                       <Button
                         key={step.title}
@@ -262,9 +262,9 @@ export function CodexCliOnboardingDialog({
                         variant="outline"
                         onClick={() => setCurrentStep(index)}
                         className={cn(
-                          "h-auto justify-start rounded-lg px-3 py-3 text-left transition-colors",
+                          "h-auto min-w-0 justify-start rounded-md px-3 py-2.5 text-left transition-colors",
                           index === currentStep
-                            ? "border-primary/40 bg-primary/10 text-foreground shadow-sm"
+                            ? "border-primary/30 bg-primary/10 text-foreground shadow-sm"
                             : "border-border/60 bg-background/70 text-muted-foreground hover:bg-accent/50",
                         )}
                       >
@@ -279,25 +279,25 @@ export function CodexCliOnboardingDialog({
                   </div>
                 </div>
 
-                <div className="mt-4">
-                  <section className="rounded-lg border border-border/60 bg-background/70 p-4">
+                <div className="mt-3">
+                  <section className="rounded-md border border-border/60 bg-background/70 p-4">
                     <div className="flex items-start gap-4">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-primary/10 text-primary">
                         <activeStep.icon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                          <span className="rounded-md bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
                             {t("步骤 {step}", { step: currentStep + 1 })}
                           </span>
                           <h4 className="text-base font-semibold leading-7 text-foreground">
                             {t(activeStep.title)}
                           </h4>
                         </div>
-                        <p className="text-sm leading-7 text-muted-foreground">
+                        <p className="text-sm leading-6 text-muted-foreground">
                           {t(activeStep.description)}
                         </p>
-                        <ul className="list-disc space-y-1.5 pl-5 text-sm leading-6 text-muted-foreground">
+                        <ul className="list-disc space-y-1 pl-5 text-sm leading-6 text-muted-foreground">
                           {activeStep.details.map((detail) => (
                             <li key={detail}>{t(detail)}</li>
                           ))}
@@ -309,8 +309,8 @@ export function CodexCliOnboardingDialog({
               </section>
             </div>
 
-            <section className="rounded-xl border border-border/60 bg-background/55 shadow-sm">
-              <div className="flex flex-col gap-3 border-b border-border/60 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+            <section className="min-h-0 rounded-md border border-border/60 bg-background/55 shadow-sm">
+              <div className="flex flex-col gap-3 border-b border-border/60 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1">
                   <h3 className="text-base font-semibold leading-7 text-foreground">
                     {t("基础配置示例")}
@@ -325,14 +325,14 @@ export function CodexCliOnboardingDialog({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="gap-2 self-start"
+                  className="gap-2 self-start rounded-md"
                   onClick={() => void handleCopyConfig()}
                 >
                   <Copy className="h-4 w-4" />
                   {t("复制配置")}
                 </Button>
               </div>
-              <div className="space-y-4 p-5">
+              <div className="space-y-3 p-4">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-3 text-sm font-semibold text-foreground">
                     <div className="space-y-1">
@@ -352,7 +352,7 @@ export function CodexCliOnboardingDialog({
                       {t("复制 auth.json")}
                     </Button>
                   </div>
-                  <pre className="overflow-auto rounded-xl border border-border/60 bg-black/90 p-4 font-mono text-xs leading-6 text-slate-100">
+                  <pre className="max-h-[14dvh] overflow-auto rounded-md border border-slate-900/80 bg-slate-950 p-3 font-mono text-xs leading-6 text-slate-100">
                     <code>{guideAuthJson}</code>
                   </pre>
                 </div>
@@ -372,7 +372,7 @@ export function CodexCliOnboardingDialog({
                   </div>
                   <pre
                     ref={codeBlockRef}
-                    className="max-h-[28vh] overflow-auto rounded-xl border border-border/60 bg-black/90 p-4 font-mono text-xs leading-6 text-slate-100"
+                    className="max-h-[20dvh] overflow-auto rounded-md border border-slate-900/80 bg-slate-950 p-3 font-mono text-xs leading-6 text-slate-100"
                   >
                     <code>{guideConfig}</code>
                   </pre>
@@ -381,7 +381,7 @@ export function CodexCliOnboardingDialog({
             </section>
           </div>
 
-          <DialogFooter className="mx-0 mb-0 mt-auto rounded-b-xl border-t border-border/60 bg-background px-6 py-4 sm:flex-nowrap sm:items-center sm:justify-between">
+          <DialogFooter className="mx-0 mb-0 mt-auto shrink-0 rounded-b-lg border-t border-border/60 bg-background/95 px-5 py-3 sm:flex-nowrap sm:items-center sm:justify-between">
             <label className="flex items-center gap-3 pr-4 text-sm text-muted-foreground">
               <Checkbox
                 checked={dismissPermanently}

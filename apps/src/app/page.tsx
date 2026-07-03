@@ -265,32 +265,34 @@ function MetricCard({
   return (
     <Card
       size="sm"
-      className="glass-card console-metric mission-panel min-h-[124px] overflow-hidden py-2 shadow-sm transition-colors"
+      className="glass-card console-metric mission-panel overflow-hidden py-0 shadow-sm transition-colors"
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5">
-        <CardTitle className="font-mono text-[11px] font-semibold uppercase text-muted-foreground">
-          {title}
-        </CardTitle>
-        <div className="flex h-9 w-9 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary shadow-sm">
-          <Icon className={cn("h-3.5 w-3.5", color)} />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="font-mono text-3xl font-semibold leading-none text-foreground">
-          {value}
-        </div>
-        <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{sub}</p>
-        {detail ? (
-          <p className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground/80" title={detail}>
-            {detail}
-          </p>
-        ) : null}
-        {badge ? (
-          <div className="mt-2 flex w-fit max-w-full items-center gap-1 rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] leading-tight text-primary">
-            <Activity className="h-2.5 w-2.5 shrink-0" />
-            {badge}
+      <CardContent className="flex min-h-[52px] items-center justify-between gap-2 px-3 py-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <CardTitle className="min-w-0 truncate text-xs font-semibold text-muted-foreground">
+              {title}
+            </CardTitle>
+            {badge ? (
+              <span
+                className="inline-flex max-w-[96px] items-center gap-1 truncate rounded-md border border-primary/20 bg-primary/8 px-1.5 py-0.5 text-[10px] leading-none text-primary"
+                title={badge}
+              >
+                <Activity className="h-2.5 w-2.5 shrink-0" />
+                <span className="truncate">{badge}</span>
+              </span>
+            ) : null}
           </div>
-        ) : null}
+          <div
+            className="mt-1 truncate font-mono text-xl font-semibold leading-none tracking-normal text-foreground tabular-nums"
+            title={detail ? `${sub} · ${detail}` : sub}
+          >
+            {value}
+          </div>
+        </div>
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background/65 text-primary shadow-sm">
+          <Icon className={cn("h-3 w-3", color)} />
+        </div>
       </CardContent>
     </Card>
   );
@@ -886,7 +888,7 @@ function AdminDashboard() {
         </Alert>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         {isLoading ? (
           Array.from({ length: 5 }).map((_, index) => (
             <Skeleton key={index} className="h-24 w-full rounded-xl" />
@@ -939,48 +941,50 @@ function AdminDashboard() {
 
             <Card
               size="sm"
-              className="glass-card console-metric mission-panel overflow-hidden py-3 shadow-sm transition-colors md:col-span-2 lg:col-span-4"
+              className="glass-card console-metric mission-panel col-span-full overflow-hidden py-0 shadow-sm transition-colors"
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                  <PieChart className="h-4 w-4 text-primary" />
-                  {t("账号池剩余")}
-                </CardTitle>
-                <Badge variant="secondary" className="border-primary/25 bg-primary/10 text-primary">
-                  POOL
-                </Badge>
-              </CardHeader>
-              <CardContent className="grid gap-4 lg:grid-cols-2">
-                <div className="mission-panel rounded-md border border-primary/15 bg-background/25 p-3">
-                  <div className="mb-2 flex items-center justify-between text-[10px]">
-                    <span className="font-mono uppercase text-muted-foreground">{t("5小时内")}</span>
-                    <span className="font-mono font-bold text-emerald-500">
-                      {formatPercent(stats.poolRemain?.primary)}
-                    </span>
-                  </div>
-                  <Progress
-                    value={poolPrimary}
-                    trackClassName={quotaTrackClass("green")}
-                    indicatorClassName={quotaIndicatorClass("green")}
-                  />
-                  <div className="mt-2 font-mono text-[10px] text-muted-foreground">
-                    {stats.poolRemain.primaryKnownCount}/{stats.poolRemain.primaryBucketCount}
-                  </div>
+              <CardContent className="grid min-h-[52px] items-center gap-2 px-3 py-2 xl:grid-cols-[140px_minmax(0,1fr)]">
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                  <CardTitle className="flex min-w-0 items-center gap-2 text-xs font-semibold">
+                    <PieChart className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="truncate">{t("账号池剩余")}</span>
+                  </CardTitle>
+                  <Badge variant="secondary" className="h-5 shrink-0 border-primary/20 bg-primary/8 px-1.5 text-[10px] text-primary">
+                    POOL
+                  </Badge>
                 </div>
-                <div className="mission-panel rounded-md border border-primary/15 bg-background/25 p-3">
-                  <div className="mb-2 flex items-center justify-between text-[10px]">
-                    <span className="font-mono uppercase text-muted-foreground">{t("7天内")}</span>
-                    <span className="font-mono font-bold text-blue-500">
-                      {formatPercent(stats.poolRemain?.secondary)}
-                    </span>
+                <div className="grid gap-2 lg:grid-cols-2">
+                  <div className="min-w-0">
+                    <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
+                      <span className="font-medium text-muted-foreground">{t("5小时内")}</span>
+                      <span className="font-mono font-bold text-emerald-500">
+                        {formatPercent(stats.poolRemain?.primary)}
+                      </span>
+                    </div>
+                    <Progress
+                      value={poolPrimary}
+                      trackClassName={quotaTrackClass("green")}
+                      indicatorClassName={quotaIndicatorClass("green")}
+                    />
+                    <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
+                      {stats.poolRemain.primaryKnownCount}/{stats.poolRemain.primaryBucketCount}
+                    </div>
                   </div>
-                  <Progress
-                    value={poolSecondary}
-                    trackClassName={quotaTrackClass("blue")}
-                    indicatorClassName={quotaIndicatorClass("blue")}
-                  />
-                  <div className="mt-2 font-mono text-[10px] text-muted-foreground">
-                    {stats.poolRemain.secondaryKnownCount}/{stats.poolRemain.secondaryBucketCount}
+                  <div className="min-w-0">
+                    <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
+                      <span className="font-medium text-muted-foreground">{t("7天内")}</span>
+                      <span className="font-mono font-bold text-blue-500">
+                        {formatPercent(stats.poolRemain?.secondary)}
+                      </span>
+                    </div>
+                    <Progress
+                      value={poolSecondary}
+                      trackClassName={quotaTrackClass("blue")}
+                      indicatorClassName={quotaIndicatorClass("blue")}
+                    />
+                    <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
+                      {stats.poolRemain.secondaryKnownCount}/{stats.poolRemain.secondaryBucketCount}
+                    </div>
                   </div>
                 </div>
               </CardContent>

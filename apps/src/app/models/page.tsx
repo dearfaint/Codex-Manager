@@ -720,13 +720,13 @@ export default function ModelsPage() {
                 ) : null}
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                <div className="flex h-10 items-center gap-2 rounded-md border border-border/60 bg-background/35 px-3">
+                <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-background/45 px-3 shadow-[inset_0_1px_0_rgb(255_255_255/0.06)] transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
                   <Search className="h-4 w-4 text-muted-foreground" />
                   <Input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder={t("搜索 slug、显示名称或描述")}
-                    className="h-full bg-transparent px-0 shadow-none focus-visible:ring-0"
+                    className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:border-transparent focus-visible:ring-0"
                   />
                 </div>
                 <Select value={filter} onValueChange={(value) => setFilter(value as ModelFilter)}>

@@ -169,16 +169,16 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 grid min-h-[76px] grid-cols-[minmax(0,auto)_minmax(0,1fr)_auto] items-center gap-3 glass-header px-4 xl:px-6">
+      <header className="sticky top-0 z-30 flex min-h-[72px] items-center gap-3 glass-header px-4 xl:px-5">
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
-        <div className="flex min-w-0 items-center gap-3 overflow-hidden">
-          <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-primary/20 bg-white text-primary shadow-sm">
+        <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background/80 text-primary shadow-sm">
             <span className="absolute inset-x-2 top-1 h-px bg-primary/25" />
             <span className="absolute inset-x-2 bottom-1 h-px bg-primary/10" />
             <span className="font-mono text-xs font-semibold">CM</span>
           </div>
           <div className="min-w-0">
-            <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase text-primary/70">
+            <p className="hidden items-center gap-1.5 font-mono text-[10px] font-semibold uppercase text-primary/70 sm:flex">
               <Cpu className="h-3 w-3" />
               CodexManager Admin Console
             </p>
@@ -186,7 +186,7 @@ export function Header() {
           </div>
           <Badge
             variant={serviceStatus.connected ? "default" : "secondary"}
-            className="h-6 rounded-md border-primary/20 bg-primary/10 px-2.5 font-mono text-[11px] text-primary shadow-sm"
+            className="h-7 shrink-0 rounded-md border-primary/20 bg-primary/10 px-2.5 font-mono text-[11px] text-primary shadow-sm"
           >
             <span
               className={`mr-1.5 h-1.5 w-1.5 rounded-full ${
@@ -196,35 +196,35 @@ export function Header() {
             {serviceStatus.connected ? t("服务已连接") : t("服务未连接")}
           </Badge>
           {serviceStatus.version ? (
-            <span className="font-mono text-xs text-muted-foreground">v{serviceStatus.version}</span>
+            <span className="hidden font-mono text-xs text-muted-foreground 2xl:inline">v{serviceStatus.version}</span>
           ) : null}
         </div>
 
-        <div className="hidden min-w-0 items-center justify-center px-2 lg:flex">
-          <div className="grid w-full max-w-[620px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-border/70 bg-background/65 px-2.5 py-1.5 shadow-[inset_0_1px_0_rgb(255_255_255/0.18)]">
-            <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase text-muted-foreground">
+        <div className="hidden min-w-[180px] max-w-[360px] flex-[0_1_360px] items-center justify-center xl:flex 2xl:max-w-[420px] 2xl:flex-[0_1_420px]">
+          <div className="grid h-9 w-full grid-cols-[minmax(0,1fr)] items-center gap-2 rounded-md border border-border/60 bg-background/55 px-1.5 shadow-[inset_0_1px_0_rgb(255_255_255/0.16)] 2xl:grid-cols-[auto_minmax(0,1fr)_auto] 2xl:px-2.5">
+            <div className="hidden items-center gap-1.5 font-mono text-[10px] uppercase text-muted-foreground 2xl:flex">
               <RadioTower className="h-3.5 w-3.5 text-primary" />
               System notice
             </div>
             <DisclaimerTicker />
-            <div className="hidden items-center gap-1.5 font-mono text-[10px] uppercase text-muted-foreground xl:flex">
+            <div className="hidden items-center gap-1.5 font-mono text-[10px] uppercase text-muted-foreground 2xl:flex">
               <Activity className="h-3.5 w-3.5 text-emerald-400" />
               Live
             </div>
           </div>
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2 xl:gap-3">
-          <LanguageSwitcher compact triggerClassName="w-[124px] xl:w-[132px]" />
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <LanguageSwitcher compact triggerClassName="w-[112px] 2xl:w-[124px]" />
 
           {canManageService ? (
-            <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background/65 px-2.5 py-1.5 shadow-[inset_0_1px_0_rgb(255_255_255/0.18)]">
+            <div className="flex h-9 items-center gap-2 rounded-md border border-border/60 bg-background/55 px-2.5 shadow-[inset_0_1px_0_rgb(255_255_255/0.16)]">
               <span className="flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase text-muted-foreground">
                 <Gauge className="h-3.5 w-3.5 text-primary" />
-                {t("监听端口")}
+                <span className="hidden 2xl:inline">{t("监听端口")}</span>
               </span>
               <Input
-                className="h-7 w-16 border-0 bg-transparent p-0 font-mono text-xs text-primary focus-visible:ring-0"
+                className="h-7 w-14 border-0 bg-transparent p-0 font-mono text-xs text-primary focus-visible:ring-0"
                 placeholder="48760"
                 value={portInput}
                 onChange={(event) => {
