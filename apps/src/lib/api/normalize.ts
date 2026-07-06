@@ -2,6 +2,7 @@
 
 import {
   Account,
+  AccountGroup,
   AccountListResult,
   AccountUsage,
   AggregateApi,
@@ -513,6 +514,29 @@ export function normalizeAccountList(
   };
 }
 
+export function normalizeAccountGroup(item: unknown): AccountGroup | null {
+  const source = asObject(item);
+  const name = asString(source.name);
+  if (!name) return null;
+  return {
+    name,
+    description: asString(source.description) || null,
+    status: asString(source.status) || "active",
+    sort: asInteger(source.sort, 0),
+    accountCount: asInteger(source.accountCount ?? source.account_count, 0),
+    apiKeyCount: asInteger(source.apiKeyCount ?? source.api_key_count, 0),
+    createdAt: toNullableNumber(source.createdAt ?? source.created_at) ?? 0,
+    updatedAt: toNullableNumber(source.updatedAt ?? source.updated_at) ?? 0,
+  };
+}
+
+export function normalizeAccountGroupList(payload: unknown): AccountGroup[] {
+  const source = asObject(payload);
+  return asArray(source.items ?? payload)
+    .map((item) => normalizeAccountGroup(item))
+    .filter((item): item is AccountGroup => Boolean(item));
+}
+
 /**
  * 函数 `attachUsagesToAccounts`
  *
@@ -811,6 +835,7 @@ export function normalizeApiKey(item: unknown): ApiKey | null {
     rotationStrategy: asString(source.rotationStrategy ?? source.rotation_strategy) || "account_rotation",
     aggregateApiId: asString(source.aggregateApiId ?? source.aggregate_api_id) || null,
     accountPlanFilter: asString(source.accountPlanFilter ?? source.account_plan_filter) || null,
+    accountGroupFilter: asString(source.accountGroupFilter ?? source.account_group_filter) || null,
     aggregateApiUrl: asString(source.aggregateApiUrl ?? source.aggregate_api_url) || null,
     quotaLimitTokens: toNullableNumber(source.quotaLimitTokens ?? source.quota_limit_tokens),
     protocol: asString(source.protocolType ?? source.protocol_type) || "openai_compat",
@@ -973,6 +998,8 @@ export function normalizeAggregateApiCreateResult(payload: unknown): AggregateAp
   return {
     id: asString(source.id),
     key: asString(source.key),
+    modelSyncOk: asBoolean(source.modelSyncOk ?? source.model_sync_ok, true),
+    modelSyncError: asString(source.modelSyncError ?? source.model_sync_error) || null,
   };
 }
 

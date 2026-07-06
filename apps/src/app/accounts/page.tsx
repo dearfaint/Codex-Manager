@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useDesktopPageActive } from "@/hooks/useDesktopPageActive";
@@ -10,13 +11,18 @@ import { useI18n } from "@/lib/i18n/provider";
 import {
   buildAccountsBySizeOrder,
   buildAccountOrderUpdates,
+  type AccountQuotaEstimate,
+  type AccountQuotaWindowEstimate,
   type AccountEditorState,
   type DeleteDialogState,
+  isOtherAccountStatus,
   normalizeAccountPlanKey,
   normalizeTagsDraft,
   type StatusFilter,
 } from "@/app/accounts/accounts-page-helpers";
 import { AccountsPageView } from "@/app/accounts/accounts-page-view";
+import { accountClient } from "@/lib/api/account-client";
+import { quotaClient } from "@/lib/api/quota-client";
 import { isBannedAccount, isLimitedAccount } from "@/lib/utils/usage";
 import type { Account } from "@/types";
 
@@ -36,6 +42,103 @@ const CLEANUP_STATUSES: CleanupStatus[] = [
   "inactive",
   "unknown",
 ];
+
+const ACCOUNT_GROUP_FILTER_ALL = "__all__";
+const ACCOUNT_GROUP_FILTER_NONE = "__none__";
+
+function accountGroupFilterValue(groupName: string): string {
+  return `group:${groupName}`;
+}
+
+function accountGroupNameFromFilter(value: string): string {
+  return value.startsWith("group:") ? value.slice("group:".length) : "";
+}
+
+function normalizePercent(value: number | null | undefined): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.min(100, Math.max(0, value));
+}
+
+function positiveNumber(value: number | null | undefined): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, value)
+    : 0;
+}
+
+function estimateQuotaWindowAmount(params: {
+  usedTokens: number | null | undefined;
+  usedCostUsd: number | null | undefined;
+  usedPercent: number | null | undefined;
+  remainPercent: number | null | undefined;
+  isConsumptionLoading: boolean;
+}): AccountQuotaWindowEstimate {
+  const remainPercent = normalizePercent(params.remainPercent);
+  const usedPercent =
+    normalizePercent(params.usedPercent) ??
+    (remainPercent == null ? null : normalizePercent(100 - remainPercent));
+  const usedCostUsd = positiveNumber(params.usedCostUsd);
+  const usedTokens = Math.trunc(positiveNumber(params.usedTokens));
+
+  if (remainPercent == null || usedPercent == null) {
+    return {
+      usedTokens,
+      usedCostUsd,
+      usedPercent,
+      remainPercent,
+      remainingUsd: null,
+      status: "missing_usage",
+    };
+  }
+  if (usedPercent <= 0) {
+    return {
+      usedTokens,
+      usedCostUsd,
+      usedPercent,
+      remainPercent,
+      remainingUsd: null,
+      status: "no_usage",
+    };
+  }
+  if (remainPercent <= 0) {
+    return {
+      usedTokens,
+      usedCostUsd,
+      usedPercent,
+      remainPercent,
+      remainingUsd: 0,
+      status: "ok",
+    };
+  }
+  if (params.isConsumptionLoading) {
+    return {
+      usedTokens,
+      usedCostUsd,
+      usedPercent,
+      remainPercent,
+      remainingUsd: null,
+      status: "loading",
+    };
+  }
+  if (usedCostUsd <= 0) {
+    return {
+      usedTokens,
+      usedCostUsd,
+      usedPercent,
+      remainPercent,
+      remainingUsd: null,
+      status: "missing_consumption",
+    };
+  }
+
+  return {
+    usedTokens,
+    usedCostUsd,
+    usedPercent,
+    remainPercent,
+    remainingUsd: Math.max(0, (usedCostUsd * remainPercent) / usedPercent),
+    status: "ok",
+  };
+}
 
 function normalizeCleanupStatus(status: string): CleanupStatus | null {
   const normalized = String(status || "").trim().toLowerCase();
@@ -80,14 +183,24 @@ export default function AccountsPage() {
     isReorderingAccounts,
     updateAccountProfile,
     isUpdatingProfileAccountId,
+    updateAccountsGroup,
+    isUpdatingAccountsGroup,
     toggleAccountStatus,
     isUpdatingStatusAccountId,
   } = useAccounts();
   const isPageActive = useDesktopPageActive("/accounts/");
   usePageTransitionReady("/accounts/", !isServiceReady || !isLoading);
+  const accountGroupsQuery = useQuery({
+    queryKey: ["account-groups"],
+    queryFn: () => accountClient.listAccountGroups(),
+    enabled: isServiceReady && isPageActive,
+  });
 
   const [search, setSearch] = useState("");
   const [planFilter, setPlanFilter] = useState("all");
+  const [accountGroupFilter, setAccountGroupFilter] = useState(
+    ACCOUNT_GROUP_FILTER_ALL,
+  );
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [pageSize, setPageSize] = useState("20");
   const [page, setPage] = useState(1);
@@ -100,6 +213,7 @@ export default function AccountsPage() {
   );
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [labelDraft, setLabelDraft] = useState("");
+  const [groupNameDraft, setGroupNameDraft] = useState("");
   const [tagsDraft, setTagsDraft] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
   const [sortDraft, setSortDraft] = useState("");
@@ -132,6 +246,130 @@ export default function AccountsPage() {
       ? "DL"
       : "ZIP";
 
+  const accountGroupFilterOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    let ungroupedCount = 0;
+    for (const account of accounts) {
+      const groupName = String(account.groupName || "").trim();
+      if (!groupName) {
+        ungroupedCount += 1;
+        continue;
+      }
+      counts.set(groupName, (counts.get(groupName) || 0) + 1);
+    }
+
+    const options = [
+      {
+        value: ACCOUNT_GROUP_FILTER_ALL,
+        label: `${t("全部账号组")} (${accounts.length})`,
+      },
+    ];
+    if (ungroupedCount > 0) {
+      options.push({
+        value: ACCOUNT_GROUP_FILTER_NONE,
+        label: `${t("未分组")} (${ungroupedCount})`,
+      });
+    }
+
+    const seen = new Set<string>();
+    for (const group of accountGroupsQuery.data ?? []) {
+      const name = String(group.name || "").trim();
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      options.push({
+        value: accountGroupFilterValue(name),
+        label: `${name} (${counts.get(name) ?? group.accountCount ?? 0})`,
+      });
+    }
+
+    Array.from(counts.keys())
+      .filter((name) => !seen.has(name))
+      .sort((left, right) => left.localeCompare(right, "zh-Hans-CN"))
+      .forEach((name) => {
+        options.push({
+          value: accountGroupFilterValue(name),
+          label: `${name} (${counts.get(name) || 0})`,
+        });
+      });
+
+    return options;
+  }, [accountGroupsQuery.data, accounts, t]);
+
+  const quickAccountGroupOptions = useMemo(
+    () => [
+      { value: "", label: t("未分组") },
+      ...(accountGroupsQuery.data ?? [])
+        .filter((group) => group.status !== "disabled")
+        .map((group) => ({
+          value: group.name,
+          label: group.name,
+        })),
+    ],
+    [accountGroupsQuery.data, t],
+  );
+
+  const accountConsumptionIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          accounts
+            .map((account) => String(account.id || "").trim())
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [accounts],
+  );
+
+  const accountConsumptionQuery = useQuery({
+    queryKey: [
+      "quota",
+      "account-consumption",
+      accountConsumptionIds.join("|"),
+    ],
+    queryFn: () => quotaClient.accountConsumption(accountConsumptionIds),
+    enabled: isServiceReady && isPageActive && accountConsumptionIds.length > 0,
+    refetchInterval: isPageActive ? 60_000 : false,
+    refetchIntervalInBackground: false,
+  });
+
+  const accountQuotaEstimates = useMemo(() => {
+    const consumptionByAccount = new Map(
+      (accountConsumptionQuery.data?.items ?? [])
+        .map((item) => [String(item.accountId || "").trim(), item] as const)
+        .filter(([accountId]) => Boolean(accountId)),
+    );
+    const isConsumptionLoading =
+      accountConsumptionQuery.isLoading && !accountConsumptionQuery.data;
+    const estimates = new Map<string, AccountQuotaEstimate>();
+
+    for (const account of accounts) {
+      const consumption = consumptionByAccount.get(account.id);
+
+      estimates.set(account.id, {
+        primary: estimateQuotaWindowAmount({
+          usedTokens: consumption?.primaryWindowTokens,
+          usedCostUsd: consumption?.primaryWindowCostUsd,
+          usedPercent: account.usage?.usedPercent,
+          remainPercent: account.primaryRemainPercent,
+          isConsumptionLoading,
+        }),
+        secondary: estimateQuotaWindowAmount({
+          usedTokens: consumption?.secondaryWindowTokens,
+          usedCostUsd: consumption?.secondaryWindowCostUsd,
+          usedPercent: account.usage?.secondaryUsedPercent,
+          remainPercent: account.secondaryRemainPercent,
+          isConsumptionLoading,
+        }),
+      });
+    }
+
+    return estimates;
+  }, [
+    accountConsumptionQuery.data,
+    accountConsumptionQuery.isLoading,
+    accounts,
+  ]);
+
   const filteredAccounts = useMemo(() => {
     return accounts.filter((account) => {
       const matchSearch =
@@ -140,15 +378,22 @@ export default function AccountsPage() {
         account.id.toLowerCase().includes(search.toLowerCase());
       const matchPlan =
         planFilter === "all" || normalizeAccountPlanKey(account) === planFilter;
+      const accountGroupName = String(account.groupName || "").trim();
+      const matchGroup =
+        accountGroupFilter === ACCOUNT_GROUP_FILTER_ALL ||
+        (accountGroupFilter === ACCOUNT_GROUP_FILTER_NONE
+          ? !accountGroupName
+          : accountGroupName === accountGroupNameFromFilter(accountGroupFilter));
       const matchStatus =
         statusFilter === "all" ||
         (statusFilter === "available" && account.isAvailable) ||
         (statusFilter === "low_quota" && account.isLowQuota) ||
         (statusFilter === "limited" && isLimitedAccount(account)) ||
-        (statusFilter === "banned" && isBannedAccount(account));
-      return matchSearch && matchPlan && matchStatus;
+        (statusFilter === "banned" && isBannedAccount(account)) ||
+        (statusFilter === "other" && isOtherAccountStatus(account));
+      return matchSearch && matchPlan && matchGroup && matchStatus;
     });
-  }, [accounts, planFilter, search, statusFilter]);
+  }, [accountGroupFilter, accounts, planFilter, search, statusFilter]);
 
   const statusFilterOptions = useMemo(
     () => [
@@ -168,6 +413,10 @@ export default function AccountsPage() {
       {
         id: "banned" as const,
         label: `${t("封禁")} (${accounts.filter((account) => isBannedAccount(account)).length})`,
+      },
+      {
+        id: "other" as const,
+        label: `${t("其他")} (${accounts.filter(isOtherAccountStatus).length})`,
       },
     ],
     [accounts, t],
@@ -280,6 +529,11 @@ export default function AccountsPage() {
 
   const handlePlanFilterChange = (value: string | null) => {
     setPlanFilter(value || "all");
+    setPage(1);
+  };
+
+  const handleAccountGroupFilterChange = (value: string | null) => {
+    setAccountGroupFilter(value || ACCOUNT_GROUP_FILTER_ALL);
     setPage(1);
   };
 
@@ -435,6 +689,7 @@ const toggleCleanupStatus = (rawStatus: string) => {
       accountId: account.id,
       accountName: account.name,
       currentLabel: account.label,
+      currentGroupName: account.groupName || "",
       currentTags: account.tags.join(", "),
       currentNote: account.note || "",
       currentSort: account.priority,
@@ -443,6 +698,7 @@ const toggleCleanupStatus = (rawStatus: string) => {
       currentQuotaSecondaryWindowTokens: account.quotaCapacitySecondaryWindowTokens,
     });
     setLabelDraft(account.label);
+    setGroupNameDraft(account.groupName || "");
     setTagsDraft(account.tags.join(", "));
     setNoteDraft(account.note || "");
     setSortDraft(String(account.priority));
@@ -532,10 +788,35 @@ const toggleCleanupStatus = (rawStatus: string) => {
     }
   };
 
+  const handleQuickChangeAccountGroup = async (groupName: string) => {
+    const nextGroupName = groupName.trim();
+    if (!effectiveSelectedIds.length) {
+      toast.error(t("请先选择要更改账号组的账号"));
+      return;
+    }
+    const selectedIdSet = new Set(effectiveSelectedIds);
+    const targetIds = accounts
+      .filter((account) => selectedIdSet.has(account.id))
+      .filter(
+        (account) => String(account.groupName || "").trim() !== nextGroupName,
+      )
+      .map((account) => account.id);
+    if (!targetIds.length) {
+      toast.info(t("账号组未变化"));
+      return;
+    }
+    try {
+      await updateAccountsGroup(targetIds, nextGroupName);
+    } catch {
+      // mutation 已统一处理 toast，这里保持静默即可
+    }
+  };
+
   const handleConfirmAccountEditor = async () => {
     if (!accountEditorState) return;
 
     const nextLabel = labelDraft.trim();
+    const nextGroupName = groupNameDraft.trim();
     const nextTags = normalizeTagsDraft(tagsDraft);
     const nextTagsText = nextTags.join(", ");
     const nextNote = noteDraft.trim();
@@ -575,6 +856,7 @@ const toggleCleanupStatus = (rawStatus: string) => {
     const nextSort = Math.max(0, Math.trunc(parsed));
     if (
       nextLabel === accountEditorState.currentLabel &&
+      nextGroupName === accountEditorState.currentGroupName &&
       nextTagsText === accountEditorState.currentTags &&
       nextNote === accountEditorState.currentNote &&
       nextSort === accountEditorState.currentSort &&
@@ -589,6 +871,7 @@ const toggleCleanupStatus = (rawStatus: string) => {
     try {
       await updateAccountProfile(accountEditorState.accountId, {
         label: nextLabel,
+        groupName: nextGroupName,
         note: nextNote || null,
         tags: nextTags,
         sort: nextSort,
@@ -623,12 +906,16 @@ const toggleCleanupStatus = (rawStatus: string) => {
       isPageActive={isPageActive}
       search={search}
       planFilter={planFilter}
+      accountGroupFilter={accountGroupFilter}
       statusFilter={statusFilter}
       pageSize={pageSize}
       safePage={safePage}
       totalPages={totalPages}
       filteredAccounts={filteredAccounts}
       visibleAccounts={visibleAccounts}
+      accountGroupFilterOptions={accountGroupFilterOptions}
+      quickAccountGroupOptions={quickAccountGroupOptions}
+      accountQuotaEstimates={accountQuotaEstimates}
       filteredAccountIndexMap={filteredAccountIndexMap}
       effectiveSelectedIds={effectiveSelectedIds}
       addAccountModalOpen={addAccountModalOpen}
@@ -644,9 +931,11 @@ const toggleCleanupStatus = (rawStatus: string) => {
       cleanupStatusDraft={cleanupStatusDraft}
       cleanupStatusOptions={cleanupStatusOptions}
       currentEditingAccount={currentEditingAccount}
+      accountGroups={accountGroupsQuery.data ?? []}
       labelDraft={labelDraft}
       tagsDraft={tagsDraft}
       noteDraft={noteDraft}
+      groupNameDraft={groupNameDraft}
       sortDraft={sortDraft}
       modelWhitelistDraft={modelWhitelistDraft}
       quotaPrimaryDraft={quotaPrimaryDraft}
@@ -662,6 +951,7 @@ const toggleCleanupStatus = (rawStatus: string) => {
       isUpdatingPreferred={isUpdatingPreferred}
       isReorderingAccounts={isReorderingAccounts}
       isUpdatingProfileAccountId={isUpdatingProfileAccountId}
+      isUpdatingAccountsGroup={isUpdatingAccountsGroup}
       isUpdatingStatusAccountId={isUpdatingStatusAccountId}
       statusFilterOptions={statusFilterOptions}
       importFileActionLabel={importFileActionLabel}
@@ -677,6 +967,7 @@ const toggleCleanupStatus = (rawStatus: string) => {
       setLabelDraft={setLabelDraft}
       setTagsDraft={setTagsDraft}
       setNoteDraft={setNoteDraft}
+      setGroupNameDraft={setGroupNameDraft}
       setSortDraft={setSortDraft}
       setModelWhitelistDraft={setModelWhitelistDraft}
       setQuotaPrimaryDraft={setQuotaPrimaryDraft}
@@ -684,6 +975,7 @@ const toggleCleanupStatus = (rawStatus: string) => {
       setPage={setPage}
       handleSearchChange={handleSearchChange}
       handlePlanFilterChange={handlePlanFilterChange}
+      handleAccountGroupFilterChange={handleAccountGroupFilterChange}
       handleStatusFilterChange={handleStatusFilterChange}
       handlePageSizeChange={handlePageSizeChange}
       toggleSelect={toggleSelect}
@@ -701,6 +993,7 @@ const toggleCleanupStatus = (rawStatus: string) => {
       openAccountEditor={openAccountEditor}
       handleMoveAccount={handleMoveAccount}
       handleApplyAccountSizeSort={handleApplyAccountSizeSort}
+      handleQuickChangeAccountGroup={handleQuickChangeAccountGroup}
       handleConfirmAccountEditor={handleConfirmAccountEditor}
       handleConfirmDelete={handleConfirmDelete}
       refreshAllAccounts={refreshAllAccounts}

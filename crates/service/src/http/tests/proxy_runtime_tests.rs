@@ -290,6 +290,7 @@ fn insert_api_key_record(
             aggregate_api_id: None,
             aggregate_api_url: None,
             account_plan_filter: None,
+            account_group_filter: None,
             client_type: "codex".to_string(),
             protocol_type: "openai_compat".to_string(),
             auth_scheme: "authorization_bearer".to_string(),

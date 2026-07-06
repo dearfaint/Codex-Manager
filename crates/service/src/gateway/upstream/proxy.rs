@@ -614,6 +614,7 @@ pub(in super::super) fn proxy_validated_request(
         rotation_strategy,
         aggregate_api_id,
         account_plan_filter,
+        account_group_filter,
         response_adapter,
         gemini_stream_output_mode,
         tool_name_restore_map,
@@ -785,6 +786,7 @@ pub(in super::super) fn proxy_validated_request(
         model_for_log.as_deref(),
         reasoning_for_log.as_deref(),
         account_plan_filter.as_deref(),
+        account_group_filter.as_deref(),
         low_quota_candidate_mode_for_protocol(protocol_type.as_str()),
         respond_when_account_candidates_empty(execution_plan),
     ) {

@@ -486,6 +486,7 @@ fn create_owned_test_api_key(user_id: &str, name: &str, model: &str) -> String {
         None,
         None,
         None,
+        None,
     )
     .expect("create api key");
     set_api_key_owner(&created.id, "user", Some(user_id), None).expect("own api key");
@@ -1191,11 +1192,13 @@ fn member_dashboard_filters_to_current_user_keys() {
         None,
         None,
         None,
+        None,
     )
     .expect("create key one");
     let key_two = apikey_create::create_api_key(
         Some("member two key".to_string()),
         Some("gpt-5-mini".to_string()),
+        None,
         None,
         None,
         None,

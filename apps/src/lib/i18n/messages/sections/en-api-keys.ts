@@ -10,7 +10,7 @@ export const EN_API_KEYS_MESSAGES: MessageCatalog = {
   管理员视图: "Admin view",
   成员视图: "Member view",
   "请选择平台 Key 归属成员": "Select the member owner for this platform key",
-  账号组筛选: "Account group filter",
+  账号计划筛选: "Account plan filter",
   "额度分发开启时，平台 Key 必须归属到一个成员钱包。":
     "When quota distribution is enabled, the platform key must belong to a member wallet.",
   "未开启额度分发时可先不分配，开启后再补齐归属。":

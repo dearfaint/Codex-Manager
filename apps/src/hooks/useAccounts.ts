@@ -35,6 +35,7 @@ type DeleteAccountsByStatusesResult = Awaited<
   ReturnType<typeof accountClient.deleteByStatuses>
 >;
 type AccountSortUpdate = { accountId: string; sort: number };
+type UpdateAccountsGroupPayload = { accountIds: string[]; groupName: string };
 
 /**
  * 函数 `isAccountRefreshBlocked`
@@ -462,6 +463,7 @@ export function useAccounts() {
       queryClient.invalidateQueries({ queryKey: ["usage-aggregate"] }),
       queryClient.invalidateQueries({ queryKey: ["today-summary"] }),
       queryClient.invalidateQueries({ queryKey: ["startup-snapshot"] }),
+      queryClient.invalidateQueries({ queryKey: ["quota", "account-consumption"] }),
       queryClient.invalidateQueries({ queryKey: CODEX_PROFILE_CANDIDATES_QUERY_KEY }),
     ]);
   }, [
@@ -547,6 +549,7 @@ export function useAccounts() {
       queryClient.invalidateQueries({ queryKey: ["today-summary"] }),
       queryClient.invalidateQueries({ queryKey: ["startup-snapshot"] }),
       queryClient.invalidateQueries({ queryKey: ["logs"] }),
+      queryClient.invalidateQueries({ queryKey: ["quota", "account-consumption"] }),
       queryClient.invalidateQueries({ queryKey: CODEX_PROFILE_CANDIDATES_QUERY_KEY }),
     ]);
   };
@@ -554,6 +557,7 @@ export function useAccounts() {
   const invalidateAccountListData = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["accounts", "list"] }),
+      queryClient.invalidateQueries({ queryKey: ["account-groups"] }),
       queryClient.invalidateQueries({ queryKey: ["startup-snapshot"] }),
     ]);
   };
@@ -726,6 +730,7 @@ export function useAccounts() {
     mutationFn: ({
       accountId,
       label,
+      groupName,
       note,
       tags,
       sort,
@@ -735,6 +740,7 @@ export function useAccounts() {
     }: {
       accountId: string;
       label?: string | null;
+      groupName?: string | null;
       note?: string | null;
       tags?: string[] | string | null;
       sort?: number | null;
@@ -744,6 +750,7 @@ export function useAccounts() {
     }) =>
       accountClient.updateProfile(accountId, {
         label,
+        groupName,
         note,
         tags,
         sort,
@@ -765,6 +772,27 @@ export function useAccounts() {
     },
     onError: (error: unknown) => {
       toast.error(`${t("更新账号信息失败")}: ${getAppErrorMessage(error)}`);
+    },
+  });
+
+  const updateAccountsGroupMutation = useMutation({
+    mutationFn: async ({ accountIds, groupName }: UpdateAccountsGroupPayload) => {
+      const normalizedIds = Array.from(
+        new Set(accountIds.map((id) => String(id || "").trim()).filter(Boolean)),
+      );
+      for (const accountId of normalizedIds) {
+        await accountClient.updateProfile(accountId, { groupName });
+      }
+      return normalizedIds.length;
+    },
+    onSuccess: (count) => {
+      toast.success(t("账号组已更新（{count} 个）", { count }));
+    },
+    onError: (error: unknown) => {
+      toast.error(`${t("更新账号组失败")}: ${getAppErrorMessage(error)}`);
+    },
+    onSettled: async () => {
+      await invalidateAccountListData();
     },
   });
 
@@ -1022,6 +1050,7 @@ export function useAccounts() {
       accountId: string,
       params: {
         label?: string | null;
+        groupName?: string | null;
         note?: string | null;
         tags?: string[] | string | null;
         sort?: number | null;
@@ -1032,6 +1061,20 @@ export function useAccounts() {
     ) => {
       if (!ensureServiceReady("更新账号信息")) return;
       await updateAccountProfileMutation.mutateAsync({ accountId, ...params });
+    },
+    updateAccountsGroup: async (accountIds: string[], groupName: string) => {
+      if (!ensureServiceReady("更新账号组")) return;
+      const normalizedIds = Array.from(
+        new Set(accountIds.map((id) => String(id || "").trim()).filter(Boolean)),
+      );
+      if (!normalizedIds.length) {
+        toast.error(t("请先选择要更改账号组的账号"));
+        return;
+      }
+      await updateAccountsGroupMutation.mutateAsync({
+        accountIds: normalizedIds,
+        groupName,
+      });
     },
     toggleAccountStatus: (
       accountId: string,
@@ -1077,6 +1120,7 @@ export function useAccounts() {
             (updateAccountProfileMutation.variables as { accountId?: unknown }).accountId || ""
           )
         : "",
+    isUpdatingAccountsGroup: updateAccountsGroupMutation.isPending,
     isUpdatingStatusAccountId:
       toggleAccountStatusMutation.isPending &&
       toggleAccountStatusMutation.variables &&

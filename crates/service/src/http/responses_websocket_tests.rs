@@ -28,6 +28,7 @@ fn sample_api_key() -> ApiKey {
         aggregate_api_id: None,
         aggregate_api_url: None,
         account_plan_filter: None,
+        account_group_filter: None,
     }
 }
 

@@ -352,6 +352,10 @@ export const EN_MESSAGES: MessageCatalog = {
   "导出中...": "Exporting...",
   开始导出: "Start export",
   账号信息: "Account info",
+  账号组: "Account group",
+  未分组: "Ungrouped",
+  "例如：团队A / 项目1": "e.g. Team A / Project 1",
+  留空则不分组: "Leave blank for no group",
   未找到符合条件的账号: "No accounts match the current filters",
   "5小时": "5h",
   "7天": "7d",
@@ -389,6 +393,8 @@ export const EN_MESSAGES: MessageCatalog = {
   "个账号吗？删除后不可恢复。": "accounts? This action cannot be undone.",
   修改: "Edit",
   "的名称、标签、备注与排序。": "'s name, tags, notes, and order.",
+  "的名称、账号组、标签、备注、排序与额度池配置。":
+    "'s name, account group, tags, notes, order, and quota pool configuration.",
   "修改账号的基础资料。": "Edit the account's basic information.",
   账号名称: "Account name",
   "标签（逗号分隔）": "Tags (comma separated)",
@@ -1117,8 +1123,13 @@ export const EN_MESSAGES: MessageCatalog = {
   自定义源: "Custom source",
   "跟随请求表示使用请求体里的实际 model；请求日志展示的是最终生效模型。":
     "Follow request uses the actual model in the request body; request logs show the effective model.",
+  "例如：https://api.openai.com": "e.g. https://api.openai.com",
   "例如：https://api.openai.com/v1": "e.g. https://api.openai.com/v1",
   "例如：https://api.anthropic.com/v1": "e.g. https://api.anthropic.com/v1",
+  "聚合 API 已创建，但模型自动同步失败":
+    "Aggregate API created, but automatic model sync failed",
+  "请稍后手动同步聚合 API 模型":
+    "Please manually sync aggregate API models later",
   "请输入 URL": "Please enter URL",
   刷新账号: "Refresh account",
   刷新账号列表: "Refresh account list",

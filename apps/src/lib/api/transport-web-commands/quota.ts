@@ -9,6 +9,16 @@ export function createQuotaWebCommands(): Record<string, WebCommandDescriptor> {
     service_quota_model_pools: { rpcMethod: "quota/modelPools" },
     service_quota_system_pool: { rpcMethod: "quota/systemPool" },
     service_quota_capacity_config: { rpcMethod: "quota/capacityConfig" },
+    service_quota_account_consumption: {
+      rpcMethod: "quota/accountConsumption",
+      mapParams: (params) => ({
+        accountIds: Array.isArray(params?.accountIds)
+          ? params.accountIds
+          : Array.isArray(params?.account_ids)
+            ? params.account_ids
+            : [],
+      }),
+    },
     service_quota_billing_rules: { rpcMethod: "quota/billingRules" },
     service_quota_billing_rule_upsert: {
       rpcMethod: "quota/billingRule/upsert",

@@ -25,6 +25,7 @@ macro_rules! invoke_handler {
             crate::commands::quota::service_quota_model_pools,
             crate::commands::quota::service_quota_system_pool,
             crate::commands::quota::service_quota_capacity_config,
+            crate::commands::quota::service_quota_account_consumption,
             crate::commands::quota::service_quota_billing_rules,
             crate::commands::quota::service_quota_billing_rule_upsert,
             crate::commands::quota::service_quota_billing_rule_delete,
@@ -83,6 +84,9 @@ macro_rules! invoke_handler {
             // account
             crate::commands::account::local::local_account_delete,
             crate::commands::account::remote::service_account_list,
+            crate::commands::account::remote::service_account_groups_list,
+            crate::commands::account::remote::service_account_group_save,
+            crate::commands::account::remote::service_account_group_delete,
             crate::commands::account::remote::service_account_delete,
             crate::commands::account::remote::service_account_delete_many,
             crate::commands::account::remote::service_account_delete_unavailable_free,

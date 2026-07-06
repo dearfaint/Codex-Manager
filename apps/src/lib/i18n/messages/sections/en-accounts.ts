@@ -63,6 +63,17 @@ export const EN_ACCOUNTS_MESSAGES: MessageCatalog = {
     "Usage refresh connection failed. Check your network or proxy.",
   "用量刷新失败，请查看后台日志": "Usage refresh failed. Check backend logs.",
   "用量限制": "Usage limit",
+  "已消耗 Tokens": "Consumed tokens",
+  已消耗金额: "Consumed cost",
+  已用占比: "Used %",
+  按窗口内已消耗金额和当前用量占比反推:
+    "Estimated from consumed cost in the window and the current usage ratio",
+  估算方式: "Estimate method",
+  缺少消费记录: "Missing consumption records",
+  剩余占比: "Remaining %",
+  统计中: "Calculating",
+  未获取用量: "Usage not fetched",
+  暂无消耗: "No usage yet",
   "留空使用计划模板": "Leave blank to use the plan template",
   "的名称、标签、备注、排序与额度池配置。":
     "'s name, tags, notes, sort order, and quota pool configuration.",

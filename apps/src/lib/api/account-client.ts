@@ -1,6 +1,7 @@
 import { invoke, withAddr } from "./transport";
 import {
   normalizeAccountList,
+  normalizeAccountGroupList,
   normalizeAggregateApiBalanceRefreshResult,
   normalizeAggregateApiCreateResult,
   normalizeAggregateApiList,
@@ -44,6 +45,7 @@ import { serializeManagedModelForRpc } from "./model-catalog";
 import { unwrapUsageSnapshotPayload } from "./usage-response";
 import {
   AccountListResult,
+  AccountGroup,
   AccountUsage,
   AggregateApi,
   AggregateApiBalanceRefreshResult,
@@ -94,6 +96,7 @@ interface LoginStartPayload {
   openBrowser?: boolean;
   note?: string | null;
   tags?: string[] | string | null;
+  groupName?: string | null;
   workspaceId?: string | null;
 }
 
@@ -102,6 +105,7 @@ interface AccountUpdatePayload {
   preferred?: boolean | null;
   status?: string | null;
   label?: string | null;
+  groupName?: string | null;
   note?: string | null;
   tags?: string[] | string | null;
   modelSlugs?: string[] | null;
@@ -129,6 +133,7 @@ interface ApiKeyPayload {
   rotationStrategy?: string | null;
   aggregateApiId?: string | null;
   accountPlanFilter?: string | null;
+  accountGroupFilter?: string | null;
   quotaLimitTokens?: number | null;
   customKey?: string | null;
 }
@@ -396,6 +401,32 @@ export const accountClient = {
     const result = await invoke<unknown>("service_account_list", withAddr());
     return normalizeAccountList(result);
   },
+  async listAccountGroups(): Promise<AccountGroup[]> {
+    const result = await invoke<unknown>("service_account_groups_list", withAddr());
+    return normalizeAccountGroupList(result);
+  },
+  async saveAccountGroup(payload: {
+    oldName?: string | null;
+    name: string;
+    description?: string | null;
+    status?: string | null;
+    sort?: number | null;
+  }): Promise<AccountGroup> {
+    const result = await invoke<unknown>(
+      "service_account_group_save",
+      withAddr(payload),
+    );
+    const group = normalizeAccountGroupList([result])[0];
+    if (!group) throw new Error("账号组保存结果为空");
+    return group;
+  },
+  async deleteAccountGroup(name: string): Promise<AccountGroup[]> {
+    const result = await invoke<unknown>(
+      "service_account_group_delete",
+      withAddr({ name }),
+    );
+    return normalizeAccountGroupList(result);
+  },
   delete: (accountId: string) =>
     invoke("service_account_delete", withAddr({ accountId })),
   deleteMany: (accountIds: string[]) =>
@@ -436,6 +467,7 @@ export const accountClient = {
         preferred: typeof params.preferred === "boolean" ? params.preferred : null,
         status: params.status || null,
         label: params.label ?? null,
+        groupName: params.groupName ?? null,
         note: params.note ?? null,
         tags: Array.isArray(params.tags)
           ? params.tags
@@ -557,6 +589,7 @@ export const accountClient = {
         loginType: params?.loginType || "chatgpt",
         openBrowser: params?.openBrowser ?? true,
         note: params?.note || null,
+        groupName: params?.groupName || null,
         tags: Array.isArray(params?.tags)
           ? params.tags
               .map((item: string) => String(item || "").trim())
@@ -808,6 +841,7 @@ export const accountClient = {
         rotationStrategy: params.rotationStrategy || null,
         aggregateApiId: params.aggregateApiId || null,
         accountPlanFilter: params.accountPlanFilter || null,
+        accountGroupFilter: params.accountGroupFilter || null,
         quotaLimitTokens: params.quotaLimitTokens ?? null,
         customKey: params.customKey || null,
       })
@@ -833,6 +867,7 @@ export const accountClient = {
       rotationStrategy: params.rotationStrategy || null,
       aggregateApiId: params.aggregateApiId || null,
       accountPlanFilter: params.accountPlanFilter || null,
+      accountGroupFilter: params.accountGroupFilter || null,
     };
     if ("quotaLimitTokens" in params) {
       payload.quotaLimitTokens = params.quotaLimitTokens ?? null;

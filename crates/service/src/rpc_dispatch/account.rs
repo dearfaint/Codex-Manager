@@ -1,8 +1,9 @@
-use codexmanager_core::rpc::types::{JsonRpcRequest, JsonRpcResponse};
+use codexmanager_core::rpc::types::{AccountGroupUpsertParams, JsonRpcRequest, JsonRpcResponse};
 
 use crate::{
-    account_cleanup, account_delete, account_delete_many, account_export, account_import,
-    account_list, account_update, account_warmup, auth_account, auth_login, auth_tokens,
+    account_cleanup, account_delete, account_delete_many, account_export, account_groups,
+    account_import, account_list, account_update, account_warmup, auth_account, auth_login,
+    auth_tokens,
 };
 
 /// 函数 `try_handle`
@@ -19,6 +20,26 @@ use crate::{
 pub(super) fn try_handle(req: &JsonRpcRequest) -> Option<JsonRpcResponse> {
     let result = match req.method.as_str() {
         "account/list" => super::value_or_error(account_list::read_accounts()),
+        "accountGroups/list" => super::value_or_error(account_groups::read_account_groups()),
+        "accountGroups/save" => {
+            let params = req
+                .params
+                .clone()
+                .map(serde_json::from_value::<AccountGroupUpsertParams>)
+                .transpose()
+                .map_err(|err| format!("invalid account group payload: {err}"));
+            super::value_or_error(
+                params
+                    .and_then(|params| {
+                        params.ok_or_else(|| "missing account group payload".to_string())
+                    })
+                    .and_then(account_groups::upsert_account_group),
+            )
+        }
+        "accountGroups/delete" => {
+            let name = super::str_param(req, "name").unwrap_or("");
+            super::value_or_error(account_groups::delete_account_group(name))
+        }
         "account/delete" => {
             let account_id = super::str_param(req, "accountId").unwrap_or("");
             super::ok_or_error(account_delete::delete_account(account_id))
@@ -64,6 +85,7 @@ pub(super) fn try_handle(req: &JsonRpcRequest) -> Option<JsonRpcResponse> {
             let preferred = super::bool_param(req, "preferred");
             let status = super::string_param(req, "status");
             let label = super::string_param(req, "label");
+            let group_name = first_string_param(req, &["groupName", "group_name"]);
             let note = super::string_param(req, "note");
             let tags = super::string_param(req, "tags");
             let model_slugs = string_array_param(req, "modelSlugs");
@@ -77,6 +99,7 @@ pub(super) fn try_handle(req: &JsonRpcRequest) -> Option<JsonRpcResponse> {
                 preferred,
                 status.as_deref(),
                 label.as_deref(),
+                group_name.as_deref(),
                 note.as_deref(),
                 tags.as_deref(),
                 model_slugs,

@@ -55,6 +55,7 @@ pub async fn service_apikey_read_secret(
 /// - rotation_strategy: 参数 rotation_strategy
 /// - aggregate_api_id: 参数 aggregate_api_id
 /// - account_plan_filter: 参数 account_plan_filter
+/// - account_group_filter: 参数 account_group_filter
 /// - quota_limit_tokens: 参数 quota_limit_tokens
 /// - custom_key: 参数 custom_key
 ///
@@ -73,6 +74,7 @@ pub async fn service_apikey_create(
     rotation_strategy: Option<String>,
     aggregate_api_id: Option<String>,
     account_plan_filter: Option<String>,
+    account_group_filter: Option<String>,
     quota_limit_tokens: Option<i64>,
     custom_key: Option<String>,
 ) -> Result<serde_json::Value, String> {
@@ -87,6 +89,7 @@ pub async fn service_apikey_create(
       "rotationStrategy": rotation_strategy,
       "aggregateApiId": aggregate_api_id,
       "accountPlanFilter": account_plan_filter,
+      "accountGroupFilter": account_group_filter,
       "quotaLimitTokens": quota_limit_tokens,
       "customKey": custom_key,
     });
@@ -255,6 +258,7 @@ pub async fn service_apikey_usage_stats(addr: Option<String>) -> Result<serde_js
 /// - rotation_strategy: 参数 rotation_strategy
 /// - aggregate_api_id: 参数 aggregate_api_id
 /// - account_plan_filter: 参数 account_plan_filter
+/// - account_group_filter: 参数 account_group_filter
 ///
 /// # 返回
 /// 返回函数执行结果
@@ -272,6 +276,7 @@ pub async fn service_apikey_update_model(
     rotation_strategy: Option<String>,
     aggregate_api_id: Option<String>,
     account_plan_filter: Option<String>,
+    account_group_filter: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let params = serde_json::json!({
       "id": key_id,
@@ -285,6 +290,7 @@ pub async fn service_apikey_update_model(
       "rotationStrategy": rotation_strategy,
       "aggregateApiId": aggregate_api_id,
       "accountPlanFilter": account_plan_filter,
+      "accountGroupFilter": account_group_filter,
     });
     rpc_call_in_background("apikey/updateModel", addr, Some(params)).await
 }

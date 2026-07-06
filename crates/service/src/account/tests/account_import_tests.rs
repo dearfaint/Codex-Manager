@@ -1,8 +1,9 @@
 use super::{
-    extract_token_payload, import_account_auth_json, import_single_item,
+    extract_token_payload, import_account_auth_json, import_single_item, parse_items_from_content,
     resolve_logical_account_id, ExistingAccountIndex, ImportTokenPayload,
 };
 use crate::account_identity::build_account_storage_id;
+use base64::Engine;
 use codexmanager_core::storage::{now_ts, Account, Storage, Token};
 use serde_json::json;
 use std::path::PathBuf;
@@ -61,6 +62,11 @@ fn payload() -> ImportTokenPayload {
         account_id_hint: None,
         chatgpt_account_id_hint: None,
     }
+}
+
+fn jwt_with_json(payload_json: &str) -> String {
+    let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(payload_json);
+    format!("eyJhbGciOiJIUzI1NiJ9.{payload}.sig")
 }
 
 /// 函数 `resolve_logical_account_id_distinguishes_workspace_under_same_chatgpt`
@@ -273,6 +279,170 @@ fn extract_token_payload_allows_missing_id_and_refresh_tokens() {
     assert_eq!(payload.id_token, "");
     assert_eq!(payload.refresh_token, "");
     assert_eq!(payload.account_id_hint.as_deref(), Some("acc-only"));
+}
+
+#[test]
+fn parse_items_from_content_expands_sub2api_accounts() {
+    let content = json!({
+        "exported_at": "2026-07-06T00:00:00Z",
+        "accounts": [
+            {
+                "name": "Sub2API One",
+                "credentials": {
+                    "access_token": "access.sub2api.1",
+                    "refresh_token": "refresh.sub2api.1",
+                    "chatgpt_account_id": "cgpt-sub2api-1",
+                    "email": "one@example.com"
+                }
+            },
+            {
+                "name": "Sub2API Two",
+                "credentials": {
+                    "access_token": "access.sub2api.2",
+                    "chatgpt_account_id": "cgpt-sub2api-2"
+                }
+            }
+        ]
+    })
+    .to_string();
+
+    let items = parse_items_from_content(&content).expect("parse sub2api bundle");
+
+    assert_eq!(items.len(), 2);
+    let first = extract_token_payload(&items[0]).expect("first payload");
+    let second = extract_token_payload(&items[1]).expect("second payload");
+    assert_eq!(first.access_token, "access.sub2api.1");
+    assert_eq!(first.refresh_token, "refresh.sub2api.1");
+    assert_eq!(
+        first.chatgpt_account_id_hint.as_deref(),
+        Some("cgpt-sub2api-1")
+    );
+    assert_eq!(second.access_token, "access.sub2api.2");
+}
+
+#[test]
+fn import_single_item_supports_sub2api_credentials_account() {
+    let storage = Storage::open_in_memory().expect("open in memory");
+    storage.init().expect("init");
+    let mut idx = ExistingAccountIndex::build(&storage).expect("build index");
+    let item = json!({
+        "name": "Sub2API Account",
+        "credentials": {
+            "access_token": "access.sub2api",
+            "refresh_token": "refresh.sub2api",
+            "chatgpt_account_id": "cgpt-sub2api",
+            "email": "sub2api@example.com"
+        }
+    });
+
+    assert!(import_single_item(&storage, &mut idx, &item, 1).expect("import sub2api"));
+
+    let accounts = storage.list_accounts().expect("list accounts");
+    assert_eq!(accounts.len(), 1);
+    assert_eq!(accounts[0].label, "sub2api@example.com");
+    assert_eq!(
+        accounts[0].chatgpt_account_id.as_deref(),
+        Some("cgpt-sub2api")
+    );
+    let token = storage
+        .find_token_by_account_id(&accounts[0].id)
+        .expect("find token")
+        .expect("token");
+    assert_eq!(token.access_token, "access.sub2api");
+    assert_eq!(token.refresh_token, "refresh.sub2api");
+}
+
+#[test]
+fn import_single_item_supports_9router_format() {
+    let storage = Storage::open_in_memory().expect("open in memory");
+    storage.init().expect("init");
+    let mut idx = ExistingAccountIndex::build(&storage).expect("build index");
+    let access_token = jwt_with_json(
+        r#"{"sub":"sub-router","https://api.openai.com/auth":{"chatgpt_account_id":"cgpt-router-jwt","chatgpt_user_id":"user-router","chatgpt_plan_type":"plus"},"https://api.openai.com/profile":{"email":"router@example.com"}}"#,
+    );
+    let item = json!({
+        "accessToken": access_token,
+        "refreshToken": "refresh.router",
+        "provider": "codex",
+        "providerSpecificData": {
+            "chatgptAccountId": "cgpt-router",
+            "chatgptPlanType": "plus"
+        },
+        "email": "router@example.com",
+        "name": "Router Account"
+    });
+
+    assert!(import_single_item(&storage, &mut idx, &item, 1).expect("import 9router"));
+
+    let accounts = storage.list_accounts().expect("list accounts");
+    assert_eq!(accounts.len(), 1);
+    assert_eq!(accounts[0].label, "router@example.com");
+    assert_eq!(
+        accounts[0].chatgpt_account_id.as_deref(),
+        Some("cgpt-router")
+    );
+    let token = storage
+        .find_token_by_account_id(&accounts[0].id)
+        .expect("find token")
+        .expect("token");
+    assert_eq!(token.refresh_token, "refresh.router");
+}
+
+#[test]
+fn import_single_item_supports_raw_session_format() {
+    let storage = Storage::open_in_memory().expect("open in memory");
+    storage.init().expect("init");
+    let mut idx = ExistingAccountIndex::build(&storage).expect("build index");
+    let access_token = jwt_with_json(
+        r#"{"sub":"sub-session","workspace_id":"ws-session-jwt","https://api.openai.com/auth":{"chatgpt_account_id":"cgpt-session","chatgpt_user_id":"user-session"},"https://api.openai.com/profile":{"email":"session@example.com"}}"#,
+    );
+    let item = json!({
+        "accessToken": access_token,
+        "refreshToken": "refresh.session",
+        "user": {
+            "email": "session@example.com",
+            "name": "Session User"
+        },
+        "account": {
+            "id": "cgpt-session-from-account",
+            "workspaceId": "ws-session"
+        }
+    });
+
+    assert!(import_single_item(&storage, &mut idx, &item, 1).expect("import raw session"));
+
+    let accounts = storage.list_accounts().expect("list accounts");
+    assert_eq!(accounts.len(), 1);
+    assert_eq!(accounts[0].label, "session@example.com");
+    assert_eq!(
+        accounts[0].chatgpt_account_id.as_deref(),
+        Some("cgpt-session")
+    );
+    assert_eq!(accounts[0].workspace_id.as_deref(), Some("ws-session"));
+}
+
+#[test]
+fn import_single_item_supports_bare_access_token_string() {
+    let storage = Storage::open_in_memory().expect("open in memory");
+    storage.init().expect("init");
+    let mut idx = ExistingAccountIndex::build(&storage).expect("build index");
+    let access_token = jwt_with_json(
+        r#"{"sub":"sub-bare","https://api.openai.com/auth":{"chatgpt_account_id":"cgpt-bare","chatgpt_user_id":"user-bare"},"https://api.openai.com/profile":{"email":"bare@example.com"}}"#,
+    );
+    let item = serde_json::Value::String(access_token.clone());
+
+    assert!(import_single_item(&storage, &mut idx, &item, 1).expect("import bare token"));
+
+    let accounts = storage.list_accounts().expect("list accounts");
+    assert_eq!(accounts.len(), 1);
+    assert_eq!(accounts[0].label, "bare@example.com");
+    assert_eq!(accounts[0].chatgpt_account_id.as_deref(), Some("cgpt-bare"));
+    let token = storage
+        .find_token_by_account_id(&accounts[0].id)
+        .expect("find token")
+        .expect("token");
+    assert_eq!(token.access_token, access_token);
+    assert_eq!(token.refresh_token, "");
 }
 
 /// 函数 `import_single_item_reuses_existing_login_account_by_scope_identity`

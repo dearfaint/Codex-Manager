@@ -3,6 +3,7 @@
 import {
   Cable,
   LayoutDashboard,
+  FolderTree,
   Users,
   UserCog,
   Key,
@@ -40,6 +41,7 @@ import {
 const NAV_ITEM_BY_PATH = new Map<TopLevelRoutePath, { icon: LucideIcon }>([
   ["/", { icon: LayoutDashboard }],
   ["/accounts", { icon: Users }],
+  ["/account-groups", { icon: FolderTree }],
   ["/account-manager", { icon: UserCog }],
   ["/aggregate-api", { icon: Database }],
   ["/apikeys", { icon: Key }],

@@ -15,6 +15,14 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { accountClient } from "@/lib/api/account-client";
 import { CODEX_PROFILE_CANDIDATES_QUERY_KEY } from "@/lib/api/codex-profile-client";
 import { useRuntimeCapabilities } from "@/hooks/useRuntimeCapabilities";
@@ -22,7 +30,7 @@ import { useI18n } from "@/lib/i18n/provider";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { copyTextToClipboard } from "@/lib/utils/clipboard";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   FileUp,
   Info,
@@ -161,6 +169,57 @@ function normalizeImportContentForCompatibility(rawContent: string): string {
   }
 }
 
+function applyGroupNameToImportRecord(record: unknown, groupName: string): unknown {
+  const nextGroupName = groupName.trim();
+  if (
+    !nextGroupName ||
+    !record ||
+    typeof record !== "object"
+  ) {
+    return record;
+  }
+  if (Array.isArray(record)) {
+    return record.map((item) => applyGroupNameToImportRecord(item, nextGroupName));
+  }
+
+  const source = record as Record<string, unknown>;
+  if (Array.isArray(source.accounts)) {
+    return {
+      ...source,
+      accounts: source.accounts.map((item) =>
+        applyGroupNameToImportRecord(item, nextGroupName),
+      ),
+    };
+  }
+
+  const rawMeta = source.meta;
+  const meta =
+    rawMeta && typeof rawMeta === "object" && !Array.isArray(rawMeta)
+      ? { ...(rawMeta as Record<string, unknown>), groupName: nextGroupName }
+      : { groupName: nextGroupName };
+  return { ...source, meta };
+}
+
+function applyGroupNameToImportContent(rawContent: string, groupName: string): string {
+  const normalized = normalizeImportContentForCompatibility(rawContent);
+  const nextGroupName = groupName.trim();
+  if (!nextGroupName || !normalized) return normalized;
+
+  try {
+    return JSON.stringify(
+      applyGroupNameToImportRecord(JSON.parse(normalized), nextGroupName),
+    );
+  } catch {
+    if (normalized.startsWith("{") || normalized.startsWith("[")) {
+      return normalized;
+    }
+    return JSON.stringify({
+      tokens: { access_token: normalized.replace(/^Bearer\s+/i, "") },
+      meta: { groupName: nextGroupName },
+    });
+  }
+}
+
 /**
  * 函数 `buildBulkImportContents`
  *
@@ -174,19 +233,19 @@ function normalizeImportContentForCompatibility(rawContent: string): string {
  * # 返回
  * 返回函数执行结果
  */
-function buildBulkImportContents(rawContent: string): string[] {
+function buildBulkImportContents(rawContent: string, groupName = ""): string[] {
   const text = String(rawContent || "").trim();
   if (!text) return [];
 
   if (text.startsWith("{") || text.startsWith("[")) {
-    return [normalizeImportContentForCompatibility(text)];
+    return [applyGroupNameToImportContent(text, groupName)];
   }
 
   return text
     .split("\n")
     .map((item) => item.trim())
     .filter(Boolean)
-    .map((item) => normalizeImportContentForCompatibility(item));
+    .map((item) => applyGroupNameToImportContent(item, groupName));
 }
 
 /**
@@ -244,6 +303,7 @@ export function AddAccountModal({ open, onOpenChange }: AddAccountModalProps) {
   const isServiceReady = canAccessManagementRpc && serviceStatus.connected;
 
   // Login Form
+  const [groupName, setGroupName] = useState("");
   const [tags, setTags] = useState("");
   const [note, setNote] = useState("");
   const [loginUrl, setLoginUrl] = useState("");
@@ -254,6 +314,11 @@ export function AddAccountModal({ open, onOpenChange }: AddAccountModalProps) {
   const unavailableMessage = canAccessManagementRpc
     ? t("服务未连接，账号授权与导入暂不可用；连接恢复后可继续操作。")
     : t("当前运行环境暂不支持账号管理。");
+  const { data: accountGroups = [] } = useQuery({
+    queryKey: ["account-groups"],
+    queryFn: () => accountClient.listAccountGroups(),
+    enabled: open && isServiceReady,
+  });
 
   const resetModalState = useCallback(() => {
     loginPollTokenRef.current += 1;
@@ -261,6 +326,7 @@ export function AddAccountModal({ open, onOpenChange }: AddAccountModalProps) {
     setIsLoading(false);
     setIsPollingLogin(false);
     setLoginHint("");
+    setGroupName("");
     setTags("");
     setNote("");
     setLoginUrl("");
@@ -284,6 +350,7 @@ export function AddAccountModal({ open, onOpenChange }: AddAccountModalProps) {
   const invalidateLoginQueries = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+      queryClient.invalidateQueries({ queryKey: ["account-groups"] }),
       queryClient.invalidateQueries({ queryKey: ["usage"] }),
       queryClient.invalidateQueries({ queryKey: ["startup-snapshot"] }),
       queryClient.invalidateQueries({
@@ -480,6 +547,7 @@ export function AddAccountModal({ open, onOpenChange }: AddAccountModalProps) {
           .split(",")
           .map((t) => t.trim())
           .filter(Boolean),
+        groupName: groupName.trim() || null,
         note,
       });
       setLoginUrl(result.authUrl || result.verificationUrl || "");
@@ -572,7 +640,7 @@ export function AddAccountModal({ open, onOpenChange }: AddAccountModalProps) {
     if (!bulkContent.trim()) return;
     setIsLoading(true);
     try {
-      const contents = buildBulkImportContents(bulkContent);
+      const contents = buildBulkImportContents(bulkContent, groupName);
       const result = await accountClient.import(contents);
       const total = Number(result?.total || 0);
       const created = Number(result?.created || 0);
@@ -659,6 +727,40 @@ export function AddAccountModal({ open, onOpenChange }: AddAccountModalProps) {
                   </AlertDescription>
                 </Alert>
               ) : null}
+              <div className="space-y-2">
+                <Label>{t("账号组")}</Label>
+                <Select
+                  value={groupName || "__none__"}
+                  onValueChange={(value) =>
+                    setGroupName(
+                      String(value || "") === "__none__" ? "" : String(value || ""),
+                    )
+                  }
+                  disabled={!isServiceReady}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("未分组")}>
+                      {(value) =>
+                        String(value || "") === "__none__"
+                          ? t("未分组")
+                          : String(value || "")
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="__none__">{t("未分组")}</SelectItem>
+                      {accountGroups
+                        .filter((group) => group.status !== "disabled")
+                        .map((group) => (
+                          <SelectItem key={group.name} value={group.name}>
+                            {group.name}
+                          </SelectItem>
+                        ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label>{t("标签（逗号分隔）")}</Label>
                 <Input
@@ -748,6 +850,40 @@ export function AddAccountModal({ open, onOpenChange }: AddAccountModalProps) {
                   <AlertDescription>{unavailableMessage}</AlertDescription>
                 </Alert>
               ) : null}
+              <div className="space-y-2">
+                <Label>{t("账号组")}</Label>
+                <Select
+                  value={groupName || "__none__"}
+                  onValueChange={(value) =>
+                    setGroupName(
+                      String(value || "") === "__none__" ? "" : String(value || ""),
+                    )
+                  }
+                  disabled={!isServiceReady}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("未分组")}>
+                      {(value) =>
+                        String(value || "") === "__none__"
+                          ? t("未分组")
+                          : String(value || "")
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="__none__">{t("未分组")}</SelectItem>
+                      {accountGroups
+                        .filter((group) => group.status !== "disabled")
+                        .map((group) => (
+                          <SelectItem key={group.name} value={group.name}>
+                            {group.name}
+                          </SelectItem>
+                        ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label>
                   {t("账号数据（Token 可每行一个，JSON 可整段粘贴）")}

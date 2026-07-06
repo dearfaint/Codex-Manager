@@ -586,7 +586,7 @@ fn prune_stale_openai_account_source_routes(
     Ok(())
 }
 
-fn sync_aggregate_api_source_models(
+pub(crate) fn sync_aggregate_api_source_models(
     storage: &Storage,
     source_id: Option<&str>,
 ) -> Result<(), String> {

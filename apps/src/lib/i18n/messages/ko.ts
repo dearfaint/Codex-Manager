@@ -1002,8 +1002,12 @@ export const KO_MESSAGES: MessageCatalog = {
   自定义源: "사용자 소스",
   "跟随请求表示使用请求体里的实际 model；请求日志展示的是最终生效模型。":
     "요청 따름은 요청 본문에 있는 실제 model을 사용하며, 요청 로그에는 최종 적용 모델이 표시됩니다.",
+  "例如：https://api.openai.com": "예: https://api.openai.com",
   "例如：https://api.openai.com/v1": "예: https://api.openai.com/v1",
   "例如：https://api.anthropic.com/v1": "예: https://api.anthropic.com/v1",
+  "聚合 API 已创建，但模型自动同步失败":
+    "집계 API가 생성되었지만 모델 자동 동기화에 실패했습니다",
+  "请稍后手动同步聚合 API 模型": "나중에 집계 API 모델을 수동으로 동기화하세요",
   "请输入 URL": "URL을 입력하세요",
   刷新账号: "계정 새로고침",
   刷新账号列表: "계정 목록 새로고침",

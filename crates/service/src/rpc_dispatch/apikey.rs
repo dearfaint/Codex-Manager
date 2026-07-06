@@ -126,6 +126,11 @@ pub(super) fn try_handle(req: &JsonRpcRequest, actor: &RpcActor) -> Option<JsonR
             } else {
                 None
             };
+            let account_group_filter = if actor.is_admin() {
+                super::string_param(req, "accountGroupFilter")
+            } else {
+                None
+            };
             let quota_limit_tokens = super::i64_param(req, "quotaLimitTokens");
             let custom_key = super::string_param(req, "customKey");
             let created = apikey_create::create_api_key(
@@ -139,6 +144,7 @@ pub(super) fn try_handle(req: &JsonRpcRequest, actor: &RpcActor) -> Option<JsonR
                 rotation_strategy,
                 aggregate_api_id,
                 account_plan_filter,
+                account_group_filter,
                 quota_limit_tokens,
                 custom_key,
             )
@@ -277,6 +283,7 @@ pub(super) fn try_handle(req: &JsonRpcRequest, actor: &RpcActor) -> Option<JsonR
             let rotation_strategy = super::string_param(req, "rotationStrategy");
             let aggregate_api_id = super::string_param(req, "aggregateApiId");
             let account_plan_filter = super::string_param(req, "accountPlanFilter");
+            let account_group_filter = super::string_param(req, "accountGroupFilter");
             let has_quota_limit_tokens = req
                 .params
                 .as_ref()
@@ -315,6 +322,11 @@ pub(super) fn try_handle(req: &JsonRpcRequest, actor: &RpcActor) -> Option<JsonR
                     },
                     if actor.is_admin() {
                         account_plan_filter
+                    } else {
+                        None
+                    },
+                    if actor.is_admin() {
+                        account_group_filter
                     } else {
                         None
                     },

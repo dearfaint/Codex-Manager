@@ -1,3 +1,4 @@
+use base64::Engine;
 use codexmanager_core::auth::{
     extract_chatgpt_account_id, extract_chatgpt_user_id, extract_workspace_id,
     parse_id_token_claims, IdTokenClaims, DEFAULT_ISSUER,
@@ -6,7 +7,7 @@ use codexmanager_core::storage::{
     now_ts, Account, AccountImportSnapshot, AccountImportTokenSubject, Storage, Token,
 };
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
@@ -22,6 +23,7 @@ const DEFAULT_IMPORT_BATCH_SIZE: usize = 200;
 const IMPORT_BATCH_SIZE_ENV: &str = "CODEXMANAGER_ACCOUNT_IMPORT_BATCH_SIZE";
 const ACCOUNT_SORT_STEP: i64 = 5;
 const IMPORT_TOKEN_SUBJECT_PREFIX: &str = "import-token-";
+const AXONHUB_REFRESH_TOKEN_PLACEHOLDER: &str = "__missing_refresh_token__";
 
 #[derive(Debug, Serialize)]
 pub(crate) struct AccountImportResult {
@@ -721,18 +723,435 @@ fn parse_items_from_content(content: &str) -> Result<Vec<Value>, String> {
         return Ok(Vec::new());
     }
 
+    if let Some(items) = parse_bare_access_token_lines(trimmed) {
+        return Ok(items);
+    }
+
     if trimmed.starts_with('[') {
         let values: Vec<Value> =
             serde_json::from_str(trimmed).map_err(|err| format!("invalid JSON array: {err}"))?;
-        return Ok(values);
+        return Ok(values.into_iter().flat_map(expand_import_value).collect());
     }
 
     let mut out = Vec::new();
     let stream = serde_json::Deserializer::from_str(trimmed).into_iter::<Value>();
     for value in stream {
-        out.push(value.map_err(|err| format!("invalid JSON object stream: {err}"))?);
+        out.extend(expand_import_value(
+            value.map_err(|err| format!("invalid JSON object stream: {err}"))?,
+        ));
     }
     Ok(out)
+}
+
+fn parse_bare_access_token_lines(content: &str) -> Option<Vec<Value>> {
+    let lines = content
+        .lines()
+        .map(strip_bearer_prefix)
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>();
+    if lines.is_empty() {
+        return Some(Vec::new());
+    }
+    if lines.iter().all(|value| looks_like_jwt(value)) {
+        return Some(
+            lines
+                .into_iter()
+                .map(build_access_token_only_import_value)
+                .collect(),
+        );
+    }
+    None
+}
+
+fn expand_import_value(value: Value) -> Vec<Value> {
+    match value {
+        Value::Array(values) => values.into_iter().flat_map(expand_import_value).collect(),
+        Value::Object(map) => {
+            if let Some(accounts) = map.get("accounts").and_then(Value::as_array) {
+                if accounts.iter().any(is_sub2api_account_value) {
+                    return accounts
+                        .iter()
+                        .cloned()
+                        .flat_map(expand_import_value)
+                        .collect();
+                }
+            }
+            vec![normalize_external_import_item(Value::Object(map))]
+        }
+        other => vec![normalize_external_import_item(other)],
+    }
+}
+
+fn normalize_external_import_item(item: Value) -> Value {
+    match item {
+        Value::String(text) => {
+            let access_token = strip_bearer_prefix(&text);
+            if looks_like_jwt(&access_token) {
+                build_access_token_only_import_value(access_token)
+            } else {
+                Value::String(text)
+            }
+        }
+        Value::Object(map) => {
+            let original = Value::Object(map);
+            build_normalized_import_value(&original).unwrap_or(original)
+        }
+        other => other,
+    }
+}
+
+fn build_normalized_import_value(source: &Value) -> Option<Value> {
+    let access_token = pick_string_path(
+        source,
+        &[
+            &["credentials", "access_token"],
+            &["credentials", "accessToken"],
+            &["tokens", "access_token"],
+            &["tokens", "accessToken"],
+            &["access_token"],
+            &["accessToken"],
+            &["token"],
+        ],
+    )?;
+    let id_token = pick_string_path(
+        source,
+        &[
+            &["credentials", "id_token"],
+            &["credentials", "idToken"],
+            &["tokens", "id_token"],
+            &["tokens", "idToken"],
+            &["id_token"],
+            &["idToken"],
+        ],
+    );
+    let refresh_token = pick_string_path(
+        source,
+        &[
+            &["credentials", "refresh_token"],
+            &["credentials", "refreshToken"],
+            &["tokens", "refresh_token"],
+            &["tokens", "refreshToken"],
+            &["refresh_token"],
+            &["refreshToken"],
+        ],
+    )
+    .and_then(clean_import_refresh_token);
+
+    let jwt_chatgpt_account_id = extract_chatgpt_account_id(&access_token);
+    let jwt_workspace_id = extract_workspace_id(&access_token);
+    let account_id = pick_string_path(
+        source,
+        &[
+            &["credentials", "account_id"],
+            &["credentials", "chatgpt_account_id"],
+            &["tokens", "account_id"],
+            &["tokens", "accountId"],
+            &["account", "id"],
+            &["account_id"],
+            &["accountId"],
+            &["providerSpecificData", "chatgptAccountId"],
+            &["providerSpecificData", "chatgpt_account_id"],
+        ],
+    )
+    .or_else(|| pick_9router_id(source))
+    .or_else(|| jwt_chatgpt_account_id.clone());
+    let chatgpt_account_id = pick_string_path(
+        source,
+        &[
+            &["credentials", "chatgpt_account_id"],
+            &["tokens", "chatgpt_account_id"],
+            &["tokens", "chatgptAccountId"],
+            &["meta", "chatgpt_account_id"],
+            &["meta", "chatgptAccountId"],
+            &["chatgpt_account_id"],
+            &["chatgptAccountId"],
+            &["providerSpecificData", "chatgptAccountId"],
+            &["providerSpecificData", "chatgpt_account_id"],
+        ],
+    )
+    .or_else(|| jwt_chatgpt_account_id.clone());
+    let workspace_id = pick_string_path(
+        source,
+        &[
+            &["meta", "workspace_id"],
+            &["meta", "workspaceId"],
+            &["account", "workspace_id"],
+            &["account", "workspaceId"],
+            &["credentials", "workspace_id"],
+            &["credentials", "workspaceId"],
+            &["extra", "workspace_id"],
+            &["extra", "workspaceId"],
+            &["providerSpecificData", "workspaceId"],
+            &["providerSpecificData", "workspace_id"],
+            &["workspace_id"],
+            &["workspaceId"],
+        ],
+    )
+    .or(jwt_workspace_id);
+    let label = if id_token.is_some() {
+        None
+    } else {
+        pick_string_path(
+            source,
+            &[
+                &["meta", "label"],
+                &["user", "email"],
+                &["credentials", "email"],
+                &["extra", "email"],
+                &["email"],
+                &["extra", "name"],
+                &["name"],
+                &["user", "name"],
+            ],
+        )
+        .or_else(|| {
+            extract_jwt_string(
+                &access_token,
+                &[&["https://api.openai.com/profile", "email"], &["email"]],
+            )
+        })
+    };
+
+    let mut tokens = Map::new();
+    insert_string(&mut tokens, "access_token", Some(access_token));
+    insert_string(&mut tokens, "id_token", id_token);
+    insert_string(&mut tokens, "refresh_token", refresh_token);
+    insert_string(&mut tokens, "account_id", account_id);
+    insert_string(
+        &mut tokens,
+        "chatgpt_account_id",
+        chatgpt_account_id.clone(),
+    );
+
+    let mut meta = Map::new();
+    copy_first_value(
+        source,
+        &mut meta,
+        "label",
+        &[&["meta", "label"], &["label"]],
+    );
+    insert_string_if_absent(&mut meta, "label", label);
+    copy_first_value(
+        source,
+        &mut meta,
+        "issuer",
+        &[&["meta", "issuer"], &["issuer"]],
+    );
+    copy_first_value(
+        source,
+        &mut meta,
+        "group_name",
+        &[
+            &["meta", "group_name"],
+            &["meta", "groupName"],
+            &["group_name"],
+            &["groupName"],
+        ],
+    );
+    copy_first_value(source, &mut meta, "note", &[&["meta", "note"], &["note"]]);
+    copy_first_value(source, &mut meta, "tags", &[&["meta", "tags"], &["tags"]]);
+    copy_first_value(
+        source,
+        &mut meta,
+        "workspace_id",
+        &[
+            &["meta", "workspace_id"],
+            &["meta", "workspaceId"],
+            &["workspace_id"],
+            &["workspaceId"],
+        ],
+    );
+    insert_string_if_absent(&mut meta, "workspace_id", workspace_id);
+    copy_first_value(
+        source,
+        &mut meta,
+        "chatgpt_account_id",
+        &[
+            &["meta", "chatgpt_account_id"],
+            &["meta", "chatgptAccountId"],
+            &["chatgpt_account_id"],
+            &["chatgptAccountId"],
+        ],
+    );
+    insert_string_if_absent(&mut meta, "chatgpt_account_id", chatgpt_account_id);
+
+    let mut out = Map::new();
+    out.insert("tokens".to_string(), Value::Object(tokens));
+    if !meta.is_empty() {
+        out.insert("meta".to_string(), Value::Object(meta));
+    }
+    Some(Value::Object(out))
+}
+
+fn build_access_token_only_import_value(access_token: String) -> Value {
+    let mut tokens = Map::new();
+    insert_string(&mut tokens, "access_token", Some(access_token.clone()));
+    insert_string(
+        &mut tokens,
+        "account_id",
+        extract_chatgpt_account_id(&access_token),
+    );
+    insert_string(
+        &mut tokens,
+        "chatgpt_account_id",
+        extract_chatgpt_account_id(&access_token),
+    );
+
+    let mut meta = Map::new();
+    insert_string(
+        &mut meta,
+        "label",
+        extract_jwt_string(
+            &access_token,
+            &[&["https://api.openai.com/profile", "email"], &["email"]],
+        ),
+    );
+    insert_string(
+        &mut meta,
+        "workspace_id",
+        extract_workspace_id(&access_token),
+    );
+    insert_string(
+        &mut meta,
+        "chatgpt_account_id",
+        extract_chatgpt_account_id(&access_token),
+    );
+
+    let mut out = Map::new();
+    out.insert("tokens".to_string(), Value::Object(tokens));
+    if !meta.is_empty() {
+        out.insert("meta".to_string(), Value::Object(meta));
+    }
+    Value::Object(out)
+}
+
+fn is_sub2api_account_value(value: &Value) -> bool {
+    value
+        .get("credentials")
+        .and_then(Value::as_object)
+        .and_then(|credentials| {
+            credentials
+                .get("access_token")
+                .or_else(|| credentials.get("accessToken"))
+        })
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_some()
+}
+
+fn pick_9router_id(source: &Value) -> Option<String> {
+    let provider = pick_string_path(source, &[&["provider"]]);
+    let has_provider_specific_data = get_path(source, &["providerSpecificData"])
+        .and_then(Value::as_object)
+        .is_some();
+    if provider.as_deref() == Some("codex") || has_provider_specific_data {
+        return pick_string_path(source, &[&["id"]]);
+    }
+    None
+}
+
+fn clean_import_refresh_token(value: String) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed == AXONHUB_REFRESH_TOKEN_PLACEHOLDER {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+fn strip_bearer_prefix(value: &str) -> String {
+    let trimmed = value.trim();
+    trimmed
+        .strip_prefix("Bearer ")
+        .or_else(|| trimmed.strip_prefix("bearer "))
+        .unwrap_or(trimmed)
+        .trim()
+        .to_string()
+}
+
+fn looks_like_jwt(value: &str) -> bool {
+    let mut parts = value.split('.');
+    matches!(
+        (parts.next(), parts.next(), parts.next(), parts.next()),
+        (Some(header), Some(payload), Some(_signature), None)
+            if !header.is_empty() && !payload.is_empty()
+    )
+}
+
+fn pick_string_path(value: &Value, paths: &[&[&str]]) -> Option<String> {
+    paths.iter().find_map(|path| {
+        get_path(value, path)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    })
+}
+
+fn get_path<'a>(value: &'a Value, path: &[&str]) -> Option<&'a Value> {
+    let mut current = value;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    Some(current)
+}
+
+fn insert_string(map: &mut Map<String, Value>, key: &str, value: Option<String>) {
+    if let Some(value) = value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+    {
+        map.insert(key.to_string(), Value::String(value));
+    }
+}
+
+fn insert_string_if_absent(map: &mut Map<String, Value>, key: &str, value: Option<String>) {
+    if map.contains_key(key) {
+        return;
+    }
+    insert_string(map, key, value);
+}
+
+fn copy_first_value(
+    source: &Value,
+    target: &mut Map<String, Value>,
+    target_key: &str,
+    paths: &[&[&str]],
+) {
+    if target.contains_key(target_key) {
+        return;
+    }
+    if let Some(value) = paths
+        .iter()
+        .find_map(|path| get_path(source, path))
+        .filter(|value| !value_is_empty_string(value))
+    {
+        target.insert(target_key.to_string(), value.clone());
+    }
+}
+
+fn value_is_empty_string(value: &Value) -> bool {
+    value
+        .as_str()
+        .map(str::trim)
+        .map(str::is_empty)
+        .unwrap_or(false)
+}
+
+fn extract_jwt_string(token: &str, paths: &[&[&str]]) -> Option<String> {
+    let payload = jwt_payload_value(token)?;
+    pick_string_path(&payload, paths)
+}
+
+fn jwt_payload_value(token: &str) -> Option<Value> {
+    let mut parts = token.split('.');
+    let _header = parts.next()?;
+    let payload = parts.next()?;
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .ok()?;
+    serde_json::from_slice(&decoded).ok()
 }
 
 /// 函数 `import_single_item`
@@ -766,8 +1185,9 @@ fn import_single_item_with_account_id(
     item: &Value,
     sequence: usize,
 ) -> Result<ImportedAccount, String> {
+    let item = normalize_external_import_item(item.clone());
     let payload = extract_token_payload(&item)?;
-    let meta = extract_account_meta(item);
+    let meta = extract_account_meta(&item);
     let claims = parse_id_token_claims(&payload.id_token).ok();
     let token_fingerprint = token_fingerprint(&payload.refresh_token);
     let subject_account_id = extract_import_subject_account_id(

@@ -66,6 +66,12 @@ export const TOP_LEVEL_ROUTE_CONFIG = [
     roles: ["system_admin", "admin"],
   },
   {
+    path: "/account-groups",
+    label: "账号组管理",
+    section: "resources",
+    roles: ["system_admin", "admin"],
+  },
+  {
     path: "/aggregate-api",
     label: "聚合 API",
     section: "resources",

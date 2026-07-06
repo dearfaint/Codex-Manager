@@ -36,6 +36,7 @@ const LAZY_PAGE_COMPONENTS: Record<
   LazyExoticComponent<ComponentType>
 > = {
   "/accounts": lazy(() => import("@/app/accounts/page")),
+  "/account-groups": lazy(() => import("@/app/account-groups/page")),
   "/account-manager": lazy(() => import("@/app/account-manager/page")),
   "/aggregate-api": lazy(() => import("@/app/aggregate-api/page")),
   "/apikeys": lazy(() => import("@/app/apikeys/page")),

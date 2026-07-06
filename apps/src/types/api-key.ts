@@ -10,6 +10,7 @@ export interface ApiKey {
   rotationStrategy: string;
   aggregateApiId: string | null;
   accountPlanFilter: string | null;
+  accountGroupFilter: string | null;
   aggregateApiUrl: string | null;
   quotaLimitTokens: number | null;
   protocol: string;
@@ -58,6 +59,8 @@ export interface AggregateApi {
 export interface AggregateApiCreateResult {
   id: string;
   key: string;
+  modelSyncOk: boolean;
+  modelSyncError: string | null;
 }
 
 export interface AggregateApiSecretResult {

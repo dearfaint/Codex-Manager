@@ -309,6 +309,7 @@ pub struct ApiKeySummary {
     pub rotation_strategy: String,
     pub aggregate_api_id: Option<String>,
     pub account_plan_filter: Option<String>,
+    pub account_group_filter: Option<String>,
     pub aggregate_api_url: Option<String>,
     pub quota_limit_tokens: Option<i64>,
     pub client_type: String,
@@ -324,6 +325,35 @@ pub struct ApiKeySummary {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiKeyListResult {
     pub items: Vec<ApiKeySummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountGroupEntry {
+    pub name: String,
+    pub description: Option<String>,
+    pub status: String,
+    pub sort: i64,
+    pub account_count: i64,
+    pub api_key_count: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountGroupListResult {
+    pub items: Vec<AccountGroupEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountGroupUpsertParams {
+    pub old_name: Option<String>,
+    pub name: String,
+    pub description: Option<String>,
+    pub status: Option<String>,
+    pub sort: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -552,6 +582,25 @@ pub struct QuotaCapacityConfigResult {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AccountQuotaConsumptionWindowResult {
+    pub account_id: String,
+    pub primary_window_tokens: i64,
+    pub primary_window_cost_usd: f64,
+    pub secondary_window_tokens: i64,
+    pub secondary_window_cost_usd: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountQuotaConsumptionResult {
+    pub primary_window_start_ts: i64,
+    pub secondary_window_start_ts: i64,
+    pub window_end_ts: i64,
+    pub items: Vec<AccountQuotaConsumptionWindowResult>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct QuotaPoolSourceBreakdown {
     pub source_kind: String,
     pub source_id: String,
@@ -752,6 +801,8 @@ pub struct AggregateApiListResult {
 pub struct AggregateApiCreateResult {
     pub id: String,
     pub key: String,
+    pub model_sync_ok: bool,
+    pub model_sync_error: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use codexmanager_core::rpc::types::{
-    AccountQuotaCapacityOverrideResult, AccountQuotaCapacityTemplateResult, BillingRuleResult,
+    AccountQuotaCapacityOverrideResult, AccountQuotaCapacityTemplateResult,
+    AccountQuotaConsumptionResult, AccountQuotaConsumptionWindowResult, BillingRuleResult,
     ModelPriceRuleEntry, ModelPriceRuleListResult, ModelPriceRuleUpsertInput,
     QuotaAggregateApiOverviewResult, QuotaApiKeyOverviewResult, QuotaBillingRulesResult,
     QuotaCapacityConfigResult, QuotaModelPoolItem, QuotaModelPoolsResult, QuotaModelUsageItem,
@@ -513,10 +514,80 @@ impl AccountCapacityConfig {
 }
 
 const ACCOUNT_CAPACITY_TEMPLATE_SLOTS: &[&str] = &["free", "plus", "pro", "team", "enterprise"];
+const PRIMARY_ACCOUNT_QUOTA_WINDOW_SECS: i64 = 5 * 60 * 60;
+const SECONDARY_ACCOUNT_QUOTA_WINDOW_SECS: i64 = 7 * 24 * 60 * 60;
 
 pub(crate) fn read_quota_capacity_config() -> Result<QuotaCapacityConfigResult, String> {
     let storage = open_storage().ok_or_else(|| "open storage failed".to_string())?;
     read_quota_capacity_config_with_storage(&storage)
+}
+
+pub(crate) fn read_account_quota_consumption(
+    account_ids: Vec<String>,
+) -> Result<AccountQuotaConsumptionResult, String> {
+    let storage = open_storage().ok_or_else(|| "open storage failed".to_string())?;
+    let window_end_ts = now_ts();
+    let primary_window_start_ts = window_end_ts.saturating_sub(PRIMARY_ACCOUNT_QUOTA_WINDOW_SECS);
+    let secondary_window_start_ts =
+        window_end_ts.saturating_sub(SECONDARY_ACCOUNT_QUOTA_WINDOW_SECS);
+    let requested = normalize_account_id_set(account_ids);
+    if requested.is_empty() {
+        return Ok(AccountQuotaConsumptionResult {
+            primary_window_start_ts,
+            secondary_window_start_ts,
+            window_end_ts,
+            items: Vec::new(),
+        });
+    }
+
+    let primary = account_consumption_map(
+        storage
+            .summarize_request_token_stats_by_source_between(
+                "openai_account",
+                primary_window_start_ts,
+                window_end_ts,
+            )
+            .map_err(|err| format!("summarize 5h account consumption failed: {err}"))?,
+        &requested,
+    );
+    let secondary = account_consumption_map(
+        storage
+            .summarize_request_token_stats_by_source_between(
+                "openai_account",
+                secondary_window_start_ts,
+                window_end_ts,
+            )
+            .map_err(|err| format!("summarize 7d account consumption failed: {err}"))?,
+        &requested,
+    );
+
+    let items = requested
+        .into_iter()
+        .map(|account_id| {
+            let primary_usage = primary
+                .get(account_id.as_str())
+                .copied()
+                .unwrap_or_default();
+            let secondary_usage = secondary
+                .get(account_id.as_str())
+                .copied()
+                .unwrap_or_default();
+            AccountQuotaConsumptionWindowResult {
+                account_id,
+                primary_window_tokens: primary_usage.0,
+                primary_window_cost_usd: primary_usage.1,
+                secondary_window_tokens: secondary_usage.0,
+                secondary_window_cost_usd: secondary_usage.1,
+            }
+        })
+        .collect();
+
+    Ok(AccountQuotaConsumptionResult {
+        primary_window_start_ts,
+        secondary_window_start_ts,
+        window_end_ts,
+        items,
+    })
 }
 
 fn read_quota_capacity_config_with_storage(
@@ -540,6 +611,33 @@ fn read_quota_capacity_config_with_storage(
             .map(override_result)
             .collect(),
     })
+}
+
+fn normalize_account_id_set(account_ids: Vec<String>) -> BTreeSet<String> {
+    account_ids
+        .into_iter()
+        .map(|id| id.trim().to_string())
+        .filter(|id| !id.is_empty())
+        .collect()
+}
+
+fn account_consumption_map(
+    rows: Vec<codexmanager_core::storage::SourceTokenUsageRollup>,
+    requested: &BTreeSet<String>,
+) -> HashMap<String, (i64, f64)> {
+    rows.into_iter()
+        .filter(|row| row.source_kind == "openai_account")
+        .filter(|row| requested.contains(row.source_id.as_str()))
+        .map(|row| {
+            (
+                row.source_id,
+                (
+                    row.usage.total_tokens.max(0),
+                    row.usage.estimated_cost_usd.max(0.0),
+                ),
+            )
+        })
+        .collect()
 }
 
 pub(crate) fn set_quota_source_models(

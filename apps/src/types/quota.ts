@@ -158,6 +158,21 @@ export interface QuotaCapacityConfigResult {
   accountOverrides: AccountQuotaCapacityOverride[];
 }
 
+export interface AccountQuotaConsumptionItem {
+  accountId: string;
+  primaryWindowTokens: number;
+  primaryWindowCostUsd: number;
+  secondaryWindowTokens: number;
+  secondaryWindowCostUsd: number;
+}
+
+export interface AccountQuotaConsumptionResult {
+  primaryWindowStartTs: number;
+  secondaryWindowStartTs: number;
+  windowEndTs: number;
+  items: AccountQuotaConsumptionItem[];
+}
+
 export interface QuotaPoolSourceBreakdown {
   sourceKind: string;
   sourceId: string;

@@ -86,6 +86,7 @@ pub(crate) fn create_api_key(
     rotation_strategy: Option<String>,
     aggregate_api_id: Option<String>,
     account_plan_filter: Option<String>,
+    account_group_filter: Option<String>,
     quota_limit_tokens: Option<i64>,
     custom_key: Option<String>,
 ) -> Result<ApiKeyCreateResult, String> {
@@ -115,6 +116,13 @@ pub(crate) fn create_api_key(
     } else {
         None
     };
+    let account_group_filter = if rotation_strategy == crate::apikey_profile::ROTATION_ACCOUNT
+        || rotation_strategy == crate::apikey_profile::ROTATION_HYBRID
+    {
+        crate::account_groups::normalize_account_group_filter(account_group_filter, &storage)?
+    } else {
+        None
+    };
     let record = ApiKey {
         id: key_id.clone(),
         name,
@@ -124,6 +132,7 @@ pub(crate) fn create_api_key(
         rotation_strategy,
         aggregate_api_id,
         account_plan_filter,
+        account_group_filter,
         aggregate_api_url: None,
         client_type,
         protocol_type,

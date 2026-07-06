@@ -143,6 +143,7 @@ export function ApiKeyModal({
   const [serviceTier, setServiceTier] = useState("");
   const [rotationStrategy, setRotationStrategy] = useState("account_rotation");
   const [accountPlanFilter, setAccountPlanFilter] = useState("all");
+  const [accountGroupFilter, setAccountGroupFilter] = useState("__all__");
   const [quotaLimitValue, setQuotaLimitValue] = useState("");
   const [quotaLimitUnit, setQuotaLimitUnit] = useState<QuotaLimitUnit>("k");
   const [upstreamBaseUrl, setUpstreamBaseUrl] = useState("");
@@ -185,6 +186,12 @@ export function ApiKeyModal({
     enabled: open && isServiceReady,
   });
 
+  const { data: accountGroups = [] } = useQuery({
+    queryKey: ["account-groups"],
+    queryFn: () => accountClient.listAccountGroups(),
+    enabled: open && isServiceReady && isAdminMode,
+  });
+
   const selectedModelInfo = useMemo(
     () => findBestMatchingModel(models?.models || [], modelSlug),
     [modelSlug, models?.models],
@@ -215,6 +222,14 @@ export function ApiKeyModal({
   const modelLabelMap = Object.fromEntries(
     visibleModels.map((model) => [model.slug, model.displayName || model.slug]),
   );
+  const selectableAccountGroups = useMemo(
+    () =>
+      accountGroups.filter(
+        (group) =>
+          group.status !== "disabled" || group.name === accountGroupFilter,
+      ),
+    [accountGroupFilter, accountGroups],
+  );
 
   const quotaLimitTokenPreview = useMemo(
     () => parseQuotaLimitTokens(quotaLimitValue, quotaLimitUnit),
@@ -233,6 +248,7 @@ export function ApiKeyModal({
       setServiceTier("");
       setRotationStrategy("account_rotation");
       setAccountPlanFilter("all");
+      setAccountGroupFilter("__all__");
       setQuotaLimitValue("");
       setQuotaLimitUnit("k");
       setUpstreamBaseUrl("");
@@ -251,6 +267,7 @@ export function ApiKeyModal({
     setServiceTier(normalizeEditableServiceTier(apiKey.serviceTier));
     setRotationStrategy(apiKey.rotationStrategy || "account_rotation");
     setAccountPlanFilter(apiKey.accountPlanFilter || "all");
+    setAccountGroupFilter(apiKey.accountGroupFilter || "__all__");
     const resolvedQuotaUnit = resolveQuotaLimitUnit(apiKey.quotaLimitTokens);
     setQuotaLimitUnit(resolvedQuotaUnit);
     setQuotaLimitValue(
@@ -329,6 +346,10 @@ export function ApiKeyModal({
           isAdminMode && usesAccountPlanFilter && accountPlanFilter !== "all"
             ? accountPlanFilter
             : null,
+        accountGroupFilter:
+          isAdminMode && usesAccountPlanFilter && accountGroupFilter !== "__all__"
+            ? accountGroupFilter
+            : null,
         quotaLimitTokens: quotaLimitTokenPreview,
         customKey: !apiKey?.id && customKey.trim() ? customKey.trim() : null,
       };
@@ -357,6 +378,7 @@ export function ApiKeyModal({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["apikeys"] }),
         queryClient.invalidateQueries({ queryKey: ["apikey-models"] }),
+        queryClient.invalidateQueries({ queryKey: ["account-groups"] }),
         queryClient.invalidateQueries({
           queryKey: ["account-manager", "api-key-owners"],
         }),
@@ -495,7 +517,7 @@ export function ApiKeyModal({
 
           {isAdminMode && usesAccountPlanFilter ? (
             <div className="grid gap-2">
-              <Label>{t("账号组筛选")}</Label>
+              <Label>{t("账号计划筛选")}</Label>
               <Select
                 value={accountPlanFilter}
                 onValueChange={(val) => val && setAccountPlanFilter(val)}
@@ -527,6 +549,39 @@ export function ApiKeyModal({
                 {t(
                   "仅对账号轮转和混合轮转生效，可限制这把平台密钥只从指定账号计划类型中选路由账号。",
                 )}
+              </p>
+            </div>
+          ) : null}
+
+          {isAdminMode && usesAccountPlanFilter ? (
+            <div className="grid gap-2">
+              <Label>{t("账号组")}</Label>
+              <Select
+                value={accountGroupFilter}
+                onValueChange={(val) => val && setAccountGroupFilter(val)}
+                disabled={!isServiceReady}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={t("全部账号组")}>
+                    {(value) => {
+                      const name = String(value || "");
+                      return name === "__all__" ? t("全部账号组") : name;
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent align="start">
+                    <SelectGroup>
+                  <SelectItem value="__all__">{t("全部账号组")}</SelectItem>
+                  {selectableAccountGroups.map((group) => (
+                    <SelectItem key={group.name} value={group.name}>
+                      {group.name}
+                    </SelectItem>
+                  ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {t("账号组来自左侧“账号组管理”，仅对账号轮转和混合轮转生效。")}
               </p>
             </div>
           ) : null}

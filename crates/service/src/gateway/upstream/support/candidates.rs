@@ -29,6 +29,7 @@ pub(crate) fn prepare_gateway_candidates(
     storage: &Storage,
     request_model: Option<&str>,
     account_plan_filter: Option<&str>,
+    account_group_filter: Option<&str>,
     low_quota_mode: super::super::super::LowQuotaCandidateMode,
 ) -> Result<Vec<(Account, Token)>, String> {
     let normalized_model = request_model
@@ -54,6 +55,18 @@ pub(crate) fn prepare_gateway_candidates(
             low_quota_mode,
         )?
     };
+    let normalized_group_filter = account_group_filter
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && !value.eq_ignore_ascii_case("__all__"));
+    if let Some(group_filter) = normalized_group_filter {
+        candidates.retain(|(account, _)| {
+            account
+                .group_name
+                .as_deref()
+                .map(str::trim)
+                .is_some_and(|value| value == group_filter)
+        });
+    }
     let normalized_filter = account_plan_filter
         .map(str::trim)
         .filter(|value| !value.is_empty() && !value.eq_ignore_ascii_case("all"));

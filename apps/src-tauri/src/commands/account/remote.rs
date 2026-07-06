@@ -30,6 +30,7 @@ fn account_update_payload(
     preferred: Option<bool>,
     status: Option<String>,
     label: Option<String>,
+    group_name: Option<String>,
     note: Option<String>,
     tags: Option<String>,
     model_slugs: Option<Vec<String>>,
@@ -52,6 +53,9 @@ fn account_update_payload(
     }
     if let Some(value) = label {
         params.insert("label".to_string(), serde_json::json!(value));
+    }
+    if let Some(value) = group_name {
+        params.insert("groupName".to_string(), serde_json::json!(value));
     }
     if let Some(value) = note {
         params.insert("note".to_string(), serde_json::json!(value));
@@ -96,6 +100,41 @@ pub async fn service_account_list(
 ) -> Result<serde_json::Value, String> {
     apply_runtime_storage_env(&app);
     rpc_call_in_background("account/list", addr, None).await
+}
+
+#[tauri::command]
+pub async fn service_account_groups_list(
+    addr: Option<String>,
+) -> Result<serde_json::Value, String> {
+    rpc_call_in_background("accountGroups/list", addr, None).await
+}
+
+#[tauri::command]
+pub async fn service_account_group_save(
+    addr: Option<String>,
+    name: String,
+    old_name: Option<String>,
+    description: Option<String>,
+    status: Option<String>,
+    sort: Option<i64>,
+) -> Result<serde_json::Value, String> {
+    let params = serde_json::json!({
+        "oldName": old_name,
+        "name": name,
+        "description": description,
+        "status": status,
+        "sort": sort,
+    });
+    rpc_call_in_background("accountGroups/save", addr, Some(params)).await
+}
+
+#[tauri::command]
+pub async fn service_account_group_delete(
+    addr: Option<String>,
+    name: String,
+) -> Result<serde_json::Value, String> {
+    let params = serde_json::json!({ "name": name });
+    rpc_call_in_background("accountGroups/delete", addr, Some(params)).await
 }
 
 /// 函数 `service_account_delete`
@@ -204,6 +243,7 @@ pub async fn service_account_update(
     preferred: Option<bool>,
     status: Option<String>,
     label: Option<String>,
+    group_name: Option<String>,
     note: Option<String>,
     tags: Option<String>,
     model_slugs: Option<Vec<String>>,
@@ -219,6 +259,7 @@ pub async fn service_account_update(
             preferred,
             status,
             label,
+            group_name,
             note,
             tags,
             model_slugs,
@@ -301,6 +342,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .expect("payload");
         let expected = serde_json::json!({
@@ -326,6 +368,7 @@ mod tests {
         let actual = account_update_payload(
             "acc-1".to_string(),
             Some(5),
+            None,
             None,
             None,
             None,
@@ -367,6 +410,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .expect("payload");
         let expected = serde_json::json!({
@@ -381,6 +425,7 @@ mod tests {
             "acc-1".to_string(),
             None,
             Some(true),
+            None,
             None,
             None,
             None,

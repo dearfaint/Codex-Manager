@@ -10,13 +10,13 @@ use tiny_http::{Response, Server, StatusCode};
 
 use super::{
     action_path_or_default, build_codex_models_probe_url, claude_probe_fallback_models_for_api,
-    extract_custom_balance, extract_generic_balance, extract_model_ids_from_models_response,
-    extract_new_api_balance, import_aggregate_api_supplier_models, list_aggregate_apis,
-    normalize_action_override, normalize_custom_balance_query_config, normalize_provider_type,
-    normalize_provider_type_value, probe_claude_endpoint, probe_codex_endpoint,
-    provider_default_url, read_aggregate_api_secret, CustomBalanceQueryConfig,
-    AGGREGATE_API_PROVIDER_CLAUDE, AGGREGATE_API_PROVIDER_GEMINI, ALIBABA_CODING_PLAN_PROBE_MODEL,
-    CLAUDE_DEFAULT_PROBE_MODEL,
+    create_aggregate_api, extract_custom_balance, extract_generic_balance,
+    extract_model_ids_from_models_response, extract_new_api_balance,
+    import_aggregate_api_supplier_models, list_aggregate_apis, normalize_action_override,
+    normalize_custom_balance_query_config, normalize_provider_type, normalize_provider_type_value,
+    probe_claude_endpoint, probe_codex_endpoint, provider_default_url, read_aggregate_api_secret,
+    CustomBalanceQueryConfig, AGGREGATE_API_PROVIDER_CLAUDE, AGGREGATE_API_PROVIDER_GEMINI,
+    ALIBABA_CODING_PLAN_PROBE_MODEL, CLAUDE_DEFAULT_PROBE_MODEL,
 };
 
 static AGGREGATE_API_TEST_DIR_SEQ: AtomicUsize = AtomicUsize::new(0);
@@ -176,6 +176,83 @@ fn import_supplier_models_reads_supplier_identity_projection() {
 }
 
 #[test]
+fn create_aggregate_api_syncs_models_on_insert() {
+    let _lock = crate::test_env_guard();
+    let dir = new_test_dir("aggregate-api-create-sync-models");
+    let db_path = dir.join("codexmanager.db");
+    let _guard = EnvGuard::set("CODEXMANAGER_DB_PATH", db_path.to_string_lossy().as_ref());
+
+    let storage = Storage::open(&db_path).expect("open db");
+    storage.init().expect("init db");
+    drop(storage);
+
+    let server = Server::http("127.0.0.1:0").expect("start mock server");
+    let base_url = format!("http://{}", server.server_addr());
+    let (tx, rx) = mpsc::channel();
+    let join = thread::spawn(move || {
+        let request = server
+            .recv_timeout(Duration::from_secs(2))
+            .expect("receive model discovery request")
+            .expect("model discovery request present");
+        tx.send((
+            request.method().as_str().to_string(),
+            request.url().to_string(),
+        ))
+        .expect("send captured request");
+        request
+            .respond(Response::from_string(
+                r#"{"data":[{"id":"vendor-auto-sync"}]}"#,
+            ))
+            .expect("respond model discovery");
+    });
+
+    let result = create_aggregate_api(
+        Some(base_url),
+        Some("secret".to_string()),
+        Some("codex".to_string()),
+        Some("Auto Sync".to_string()),
+        Some(0),
+        Some("apikey".to_string()),
+        Some(false),
+        None,
+        Some(false),
+        None,
+        None,
+        None,
+        None,
+        Some(false),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("create aggregate api");
+    assert!(result.model_sync_ok);
+    assert_eq!(result.model_sync_error, None);
+
+    let captured = rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("captured discovery request");
+    join.join().expect("join mock server");
+    assert_eq!(captured.0, "GET");
+    assert!(captured.1.starts_with("/v1/models?client_version="));
+
+    let storage = Storage::open(&db_path).expect("reopen db");
+    let source_models = storage
+        .list_model_source_models(Some("aggregate_api"), Some(result.id.as_str()))
+        .expect("list source models");
+    assert_eq!(source_models.len(), 1);
+    assert_eq!(source_models[0].upstream_model, "vendor-auto-sync");
+    let mappings = storage
+        .list_enabled_model_source_mappings_for_platform("vendor-auto-sync")
+        .expect("list mappings");
+    assert_eq!(mappings.len(), 1);
+    assert_eq!(mappings[0].source_id, result.id);
+}
+
+#[test]
 fn read_aggregate_api_secret_uses_auth_type_projection() {
     let _lock = crate::test_env_guard();
     let dir = new_test_dir("aggregate-api-read-secret");
@@ -274,6 +351,7 @@ fn gemini_provider_type_is_normalized_independently() {
         provider_default_url(AGGREGATE_API_PROVIDER_GEMINI),
         "https://generativelanguage.googleapis.com"
     );
+    assert_eq!(provider_default_url("codex"), "https://api.openai.com");
     assert_eq!(
         normalize_provider_type(Some("claude".to_string())).unwrap(),
         AGGREGATE_API_PROVIDER_CLAUDE

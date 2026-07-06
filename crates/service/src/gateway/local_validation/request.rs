@@ -1803,6 +1803,7 @@ pub(super) fn build_local_validation_result(
             rotation_strategy: ROTATION_AGGREGATE_API.to_string(),
             aggregate_api_id: api_key.aggregate_api_id,
             account_plan_filter: api_key.account_plan_filter,
+            account_group_filter: api_key.account_group_filter,
             response_adapter: maybe_wrap_compact_response_adapter(
                 logical_path.as_str(),
                 super::super::ResponseAdapter::Passthrough,
@@ -2142,6 +2143,7 @@ pub(super) fn build_local_validation_result(
         rotation_strategy: api_key.rotation_strategy,
         aggregate_api_id: api_key.aggregate_api_id,
         account_plan_filter: api_key.account_plan_filter,
+        account_group_filter: api_key.account_group_filter,
         client_model_for_log,
         model_for_log,
         model_source_for_log,

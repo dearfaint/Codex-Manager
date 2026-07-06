@@ -730,7 +730,7 @@ fn provider_default_url(provider_type: &str) -> &'static str {
     match provider_type {
         AGGREGATE_API_PROVIDER_CLAUDE => "https://api.anthropic.com/v1",
         AGGREGATE_API_PROVIDER_GEMINI => "https://generativelanguage.googleapis.com",
-        _ => "https://api.openai.com/v1",
+        _ => "https://api.openai.com",
     }
 }
 
@@ -2174,6 +2174,14 @@ pub(crate) fn create_aggregate_api(
             ));
         }
     }
+    let mut model_sync_error = None;
+    if let Err(err) =
+        crate::apikey_models::sync_aggregate_api_source_models(&storage, Some(id.as_str()))
+    {
+        log::warn!("aggregate API {id}: initial model sync failed: {err}");
+        model_sync_error = Some(err);
+    }
+    let model_sync_ok = model_sync_error.is_none();
     Ok(AggregateApiCreateResult {
         id,
         key: if record.auth_type == AGGREGATE_API_AUTH_APIKEY {
@@ -2181,6 +2189,8 @@ pub(crate) fn create_aggregate_api(
         } else {
             String::new()
         },
+        model_sync_ok,
+        model_sync_error,
     })
 }
 

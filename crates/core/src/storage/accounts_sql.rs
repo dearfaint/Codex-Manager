@@ -73,6 +73,10 @@ pub(super) fn update_account_label_sql() -> &'static str {
     "UPDATE accounts SET label = ?1, updated_at = ?2 WHERE id = ?3"
 }
 
+pub(super) fn update_account_group_name_sql() -> &'static str {
+    "UPDATE accounts SET group_name = ?1, updated_at = ?2 WHERE id = ?3"
+}
+
 pub(super) fn update_account_workspace_identity_sql() -> &'static str {
     "UPDATE accounts
      SET chatgpt_account_id = ?1,

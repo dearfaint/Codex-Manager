@@ -36,6 +36,7 @@ pub(in super::super) fn prepare_candidates_for_proxy(
     model_for_log: Option<&str>,
     reasoning_for_log: Option<&str>,
     account_plan_filter: Option<&str>,
+    account_group_filter: Option<&str>,
     low_quota_mode: super::super::super::LowQuotaCandidateMode,
     respond_when_empty: bool,
 ) -> CandidatePrecheckResult {
@@ -43,6 +44,7 @@ pub(in super::super) fn prepare_candidates_for_proxy(
         storage,
         model_for_log,
         account_plan_filter,
+        account_group_filter,
         low_quota_mode,
     ) {
         Ok(v) => v,

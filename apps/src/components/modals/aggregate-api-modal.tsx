@@ -40,7 +40,7 @@ const AGGREGATE_API_PROVIDER_LABELS: Record<string, string> = {
 };
 
 const AGGREGATE_API_URL_PLACEHOLDERS: Record<string, string> = {
-  codex: "例如：https://api.openai.com/v1",
+  codex: "例如：https://api.openai.com",
   claude: "例如：https://api.anthropic.com/v1",
 };
 
@@ -440,6 +440,10 @@ export function AggregateApiModal({
           queryClient.invalidateQueries({ queryKey: ["apikeys"] }),
           queryClient.invalidateQueries({ queryKey: ["startup-snapshot"] }),
           queryClient.invalidateQueries({ queryKey: ["quota"] }),
+          queryClient.invalidateQueries({ queryKey: ["model-routing"] }),
+          queryClient.invalidateQueries({ queryKey: ["managed-model-routing"] }),
+          queryClient.invalidateQueries({ queryKey: ["managed-model-catalog"] }),
+          queryClient.invalidateQueries({ queryKey: ["apikey-models"] }),
         ]);
         onOpenChange(false);
         return;
@@ -468,12 +472,24 @@ export function AggregateApiModal({
         modelSlugs,
       });
       setGeneratedKey(result.key);
-      toast.success(t("聚合 API 已创建"));
+      if (result.modelSyncOk) {
+        toast.success(t("聚合 API 已创建"));
+      } else {
+        toast.warning(
+          `${t("聚合 API 已创建，但模型自动同步失败")}: ${
+            result.modelSyncError || t("请稍后手动同步聚合 API 模型")
+          }`
+        );
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["aggregate-apis"] }),
         queryClient.invalidateQueries({ queryKey: ["apikeys"] }),
         queryClient.invalidateQueries({ queryKey: ["startup-snapshot"] }),
         queryClient.invalidateQueries({ queryKey: ["quota"] }),
+        queryClient.invalidateQueries({ queryKey: ["model-routing"] }),
+        queryClient.invalidateQueries({ queryKey: ["managed-model-routing"] }),
+        queryClient.invalidateQueries({ queryKey: ["managed-model-catalog"] }),
+        queryClient.invalidateQueries({ queryKey: ["apikey-models"] }),
       ]);
       onOpenChange(false);
     } catch (error: unknown) {

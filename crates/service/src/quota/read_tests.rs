@@ -137,6 +137,7 @@ fn test_api_key(id: &str, now: i64) -> ApiKey {
         rotation_strategy: "account_rotation".to_string(),
         aggregate_api_id: None,
         account_plan_filter: None,
+        account_group_filter: None,
         aggregate_api_url: None,
         client_type: "codex".to_string(),
         protocol_type: "openai_compat".to_string(),

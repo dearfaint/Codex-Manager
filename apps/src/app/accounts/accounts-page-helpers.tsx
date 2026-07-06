@@ -9,6 +9,8 @@ import {
   formatTsFromSeconds,
   getExtraUsageDisplayRows,
   getUsageDisplayBuckets,
+  isBannedAccount,
+  isLimitedAccount,
   isPrimaryWindowOnlyUsage,
   isSecondaryWindowOnlyUsage,
 } from "@/lib/utils/usage";
@@ -21,7 +23,13 @@ import {
 } from "@/components/ui/tooltip";
 import type { Account } from "@/types";
 
-export type StatusFilter = "all" | "available" | "low_quota" | "limited" | "banned";
+export type StatusFilter =
+  | "all"
+  | "available"
+  | "low_quota"
+  | "limited"
+  | "banned"
+  | "other";
 export type AccountExportMode = "single" | "multiple";
 export type AccountSizeSortMode = "large-first" | "small-first";
 
@@ -84,7 +92,7 @@ export function normalizeAccountPlanKey(account: Account) {
 export function formatPlanFilterLabel(value: string, t: TranslateFn) {
   const nextValue = String(value || "").trim();
   if (!nextValue || nextValue === "all") {
-    return t("全部类型");
+    return t("订阅类型");
   }
   return formatAccountPlanValueLabel(nextValue, t);
 }
@@ -100,6 +108,8 @@ export function formatStatusFilterLabel(value: string, t: TranslateFn) {
       return t("限流");
     case "banned":
       return t("封禁");
+    case "other":
+      return t("其他");
     case "all":
     default:
       return t("全部");
@@ -121,10 +131,32 @@ export interface QuotaSummaryItem extends QuotaProgressProps {
   id: string;
 }
 
+export type AccountQuotaEstimateStatus =
+  | "ok"
+  | "loading"
+  | "missing_usage"
+  | "no_usage"
+  | "missing_consumption";
+
+export interface AccountQuotaWindowEstimate {
+  usedTokens: number;
+  usedCostUsd: number;
+  usedPercent: number | null;
+  remainPercent: number | null;
+  remainingUsd: number | null;
+  status: AccountQuotaEstimateStatus;
+}
+
+export interface AccountQuotaEstimate {
+  primary: AccountQuotaWindowEstimate;
+  secondary: AccountQuotaWindowEstimate;
+}
+
 export interface AccountEditorState {
   accountId: string;
   accountName: string;
   currentLabel: string;
+  currentGroupName: string;
   currentTags: string;
   currentNote: string;
   currentSort: number;
@@ -613,6 +645,15 @@ export function getAccountSizeGroup(
   }
 }
 
+export function isOtherAccountStatus(account: Account): boolean {
+  return (
+    !account.isAvailable &&
+    !account.isLowQuota &&
+    !isLimitedAccount(account) &&
+    !isBannedAccount(account)
+  );
+}
+
 export function buildAccountsBySizeOrder(
   orderedAccounts: Account[],
   mode: AccountSizeSortMode,
@@ -702,6 +743,7 @@ export function AccountInfoCell({
   const statusReasonLabel = formatAccountStatusReasonLabel(account, t);
   const tagsText = formatAccountTags(account.tags);
   const noteText = String(account.note || "").trim();
+  const groupName = String(account.groupName || "").trim();
 
   return (
     <Tooltip>
@@ -732,6 +774,9 @@ export function AccountInfoCell({
                 {accountPlanLabel}
               </Badge>
             ) : null}
+            <Badge variant="outline" className="h-4 shrink-0 px-1.5 text-[9px]">
+              {t("账号组")}: {groupName || t("未分组")}
+            </Badge>
             {isPreferred ? (
               <Badge
                 variant="secondary"
@@ -747,6 +792,9 @@ export function AccountInfoCell({
           </span>
           <span className="text-[10px] text-muted-foreground">
             {t("订阅到期")}: {subscriptionExpiryText}
+          </span>
+          <span className="text-[10px] text-muted-foreground">
+            {t("账号组")}: {groupName || t("未分组")}
           </span>
         </div>
       </TooltipTrigger>
@@ -766,6 +814,12 @@ export function AccountInfoCell({
               <div className="font-medium">
                 {t(account.availabilityText || "未知")}
               </div>
+            </div>
+            <div className="space-y-0.5">
+              <div className="text-[10px] text-muted-foreground">
+                {t("账号组")}
+              </div>
+              <div className="font-medium">{groupName || t("未设置")}</div>
             </div>
             {statusReasonLabel ? (
               <div className="space-y-0.5 sm:col-span-2">

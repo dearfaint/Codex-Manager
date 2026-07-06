@@ -43,6 +43,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -72,11 +75,14 @@ import {
 } from "@/components/ui/tooltip";
 import { useI18n } from "@/lib/i18n/provider";
 import { cn } from "@/lib/utils";
+import { formatQuotaLimitUsd } from "@/lib/utils/api-key-quota";
 import { formatCompactNumber } from "@/lib/utils/usage";
-import type { Account } from "@/types";
+import type { Account, AccountGroup } from "@/types";
 import {
   type AccountEditorState,
   type AccountExportMode,
+  type AccountQuotaEstimate,
+  type AccountQuotaWindowEstimate,
   type AccountSizeSortMode,
   type DeleteDialogState,
   type StatusFilter,
@@ -103,6 +109,16 @@ interface StatusFilterOption {
   label: string;
 }
 
+interface AccountGroupFilterOption {
+  value: string;
+  label: string;
+}
+
+interface QuickAccountGroupOption {
+  value: string;
+  label: string;
+}
+
 interface CleanupStatusOption {
   id: string;
   label: string;
@@ -118,12 +134,16 @@ export interface AccountsPageViewProps {
   isPageActive: boolean;
   search: string;
   planFilter: string;
+  accountGroupFilter: string;
   statusFilter: StatusFilter;
   pageSize: string;
   safePage: number;
   totalPages: number;
   filteredAccounts: Account[];
   visibleAccounts: Account[];
+  accountGroupFilterOptions: AccountGroupFilterOption[];
+  quickAccountGroupOptions: QuickAccountGroupOption[];
+  accountQuotaEstimates: Map<string, AccountQuotaEstimate>;
   filteredAccountIndexMap: Map<string, number>;
   effectiveSelectedIds: string[];
   addAccountModalOpen: boolean;
@@ -139,7 +159,9 @@ export interface AccountsPageViewProps {
   accountEditorState: AccountEditorState | null;
   deleteDialogState: DeleteDialogState;
   currentEditingAccount: Account | null;
+  accountGroups: AccountGroup[];
   labelDraft: string;
+  groupNameDraft: string;
   tagsDraft: string;
   noteDraft: string;
   sortDraft: string;
@@ -157,6 +179,7 @@ export interface AccountsPageViewProps {
   isUpdatingPreferred: boolean;
   isReorderingAccounts: boolean;
   isUpdatingProfileAccountId: string | null;
+  isUpdatingAccountsGroup: boolean;
   isUpdatingStatusAccountId: string | null;
   statusFilterOptions: StatusFilterOption[];
   importFileActionLabel: string;
@@ -170,6 +193,7 @@ export interface AccountsPageViewProps {
   setCleanupDialogOpen: Dispatch<SetStateAction<boolean>>;
   setAccountEditorState: Dispatch<SetStateAction<AccountEditorState | null>>;
   setLabelDraft: Dispatch<SetStateAction<string>>;
+  setGroupNameDraft: Dispatch<SetStateAction<string>>;
   setTagsDraft: Dispatch<SetStateAction<string>>;
   setNoteDraft: Dispatch<SetStateAction<string>>;
   setSortDraft: Dispatch<SetStateAction<string>>;
@@ -179,6 +203,7 @@ export interface AccountsPageViewProps {
   setPage: Dispatch<SetStateAction<number>>;
   handleSearchChange: (value: string) => void;
   handlePlanFilterChange: (value: string | null) => void;
+  handleAccountGroupFilterChange: (value: string | null) => void;
   handleStatusFilterChange: (value: StatusFilter) => void;
   handlePageSizeChange: (value: string | null) => void;
   toggleSelect: (id: string) => void;
@@ -199,6 +224,7 @@ export interface AccountsPageViewProps {
     direction: "up" | "down",
   ) => Promise<void>;
   handleApplyAccountSizeSort: (mode: AccountSizeSortMode) => Promise<void>;
+  handleQuickChangeAccountGroup: (groupName: string) => Promise<void>;
   handleConfirmAccountEditor: () => Promise<void>;
   handleConfirmDelete: () => void;
   refreshAllAccounts: () => void;
@@ -217,6 +243,60 @@ export interface AccountsPageViewProps {
   ) => void;
 }
 
+function formatQuotaEstimateAmount(
+  estimate: AccountQuotaWindowEstimate | undefined,
+  t: (key: string) => string,
+): string {
+  if (!estimate) return t("统计中");
+  switch (estimate.status) {
+    case "ok":
+      return formatQuotaLimitUsd(estimate.remainingUsd);
+    case "loading":
+      return t("统计中");
+    case "missing_usage":
+      return t("未获取用量");
+    case "no_usage":
+      return t("暂无消耗");
+    case "missing_consumption":
+      return t("缺少消费记录");
+    default:
+      return "--";
+  }
+}
+
+function formatQuotaEstimatePercent(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value)
+    ? `${value.toFixed(1)}%`
+    : "--";
+}
+
+function formatQuotaEstimateWindowTitle(
+  label: string,
+  estimate: AccountQuotaWindowEstimate,
+  t: (key: string) => string,
+): string {
+  const usedTokens = estimate.usedTokens
+    ? `${formatCompactNumber(estimate.usedTokens, "0", 2, true)} tokens`
+    : "--";
+  return `${label}: ${formatQuotaEstimateAmount(estimate, t)} (${t("已消耗金额")} ${formatQuotaLimitUsd(
+    estimate.usedCostUsd,
+  )}, ${t("已消耗 Tokens")} ${usedTokens}, ${t("已用占比")} ${formatQuotaEstimatePercent(
+    estimate.usedPercent,
+  )}, ${t("剩余占比")} ${formatQuotaEstimatePercent(estimate.remainPercent)})`;
+}
+
+function formatQuotaEstimateTitle(
+  estimate: AccountQuotaEstimate | undefined,
+  t: (key: string) => string,
+): string {
+  if (!estimate) return "";
+  return `${t("估算方式")}: ${t("按窗口内已消耗金额和当前用量占比反推")}\n${formatQuotaEstimateWindowTitle(
+    t("5小时"),
+    estimate.primary,
+    t,
+  )}\n${formatQuotaEstimateWindowTitle(t("7天"), estimate.secondary, t)}`;
+}
+
 export function AccountsPageView(props: AccountsPageViewProps) {
   const { t } = useI18n();
   const {
@@ -227,12 +307,16 @@ export function AccountsPageView(props: AccountsPageViewProps) {
     isPageActive,
     search,
     planFilter,
+    accountGroupFilter,
     statusFilter,
     pageSize,
     safePage,
     totalPages,
     filteredAccounts,
     visibleAccounts,
+    accountGroupFilterOptions,
+    quickAccountGroupOptions,
+    accountQuotaEstimates,
     filteredAccountIndexMap,
     effectiveSelectedIds,
     addAccountModalOpen,
@@ -248,7 +332,9 @@ export function AccountsPageView(props: AccountsPageViewProps) {
     accountEditorState,
     deleteDialogState,
     currentEditingAccount,
+    accountGroups,
     labelDraft,
+    groupNameDraft,
     tagsDraft,
     noteDraft,
     sortDraft,
@@ -266,6 +352,7 @@ export function AccountsPageView(props: AccountsPageViewProps) {
     isUpdatingPreferred,
     isReorderingAccounts,
     isUpdatingProfileAccountId,
+    isUpdatingAccountsGroup,
     isUpdatingStatusAccountId,
     statusFilterOptions,
     importFileActionLabel,
@@ -279,6 +366,7 @@ export function AccountsPageView(props: AccountsPageViewProps) {
     setCleanupDialogOpen,
     setAccountEditorState,
     setLabelDraft,
+    setGroupNameDraft,
     setTagsDraft,
     setNoteDraft,
     setSortDraft,
@@ -288,6 +376,7 @@ export function AccountsPageView(props: AccountsPageViewProps) {
     setPage,
     handleSearchChange,
     handlePlanFilterChange,
+    handleAccountGroupFilterChange,
     handleStatusFilterChange,
     handlePageSizeChange,
     toggleSelect,
@@ -305,6 +394,7 @@ export function AccountsPageView(props: AccountsPageViewProps) {
     openAccountEditor,
     handleMoveAccount,
     handleApplyAccountSizeSort,
+    handleQuickChangeAccountGroup,
     handleConfirmAccountEditor,
     handleConfirmDelete,
     refreshAllAccounts,
@@ -350,19 +440,42 @@ export function AccountsPageView(props: AccountsPageViewProps) {
           <div className="flex shrink-0 items-center gap-3">
             <Select value={planFilter} onValueChange={handlePlanFilterChange}>
               <SelectTrigger className="h-10 w-[140px] shrink-0 rounded-xl bg-card/50">
-                <SelectValue placeholder={t("全部类型")}>
+                <SelectValue placeholder={t("订阅类型")}>
                   {(value) => formatPlanFilterLabel(String(value || ""), t)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                     <SelectGroup>
                 <SelectItem value="all">
-                  {t("全部类型")} ({accounts.length})
+                  {t("订阅类型")} ({accounts.length})
                 </SelectItem>
                 {planTypes.map((planType) => (
                   <SelectItem key={planType.value} value={planType.value}>
                     {formatAccountPlanValueLabel(planType.value, t)} (
                     {planType.count})
+                  </SelectItem>
+                ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Select
+              value={accountGroupFilter}
+              onValueChange={handleAccountGroupFilterChange}
+            >
+              <SelectTrigger className="h-10 w-[164px] shrink-0 rounded-xl bg-card/50">
+                <SelectValue placeholder={t("全部账号组")}>
+                  {(value) =>
+                    accountGroupFilterOptions.find(
+                      (option) => option.value === String(value || ""),
+                    )?.label || t("全部账号组")
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                    <SelectGroup>
+                {accountGroupFilterOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
                   </SelectItem>
                 ))}
                 </SelectGroup>
@@ -497,6 +610,34 @@ export function AccountsPageView(props: AccountsPageViewProps) {
                   >
                     <Plus className="mr-2 h-4 w-4" /> {t("添加账号")}
                   </DropdownMenuItem>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger
+                      className="h-9 rounded-lg px-2"
+                      disabled={
+                        !isServiceReady ||
+                        !effectiveSelectedIds.length ||
+                        isUpdatingAccountsGroup
+                      }
+                    >
+                      <FolderOpen className="mr-2 h-4 w-4" />
+                      {isUpdatingAccountsGroup
+                        ? t("更新账号组中...")
+                        : t("快捷更改账号组")}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="max-h-72 w-56 overflow-y-auto">
+                      {quickAccountGroupOptions.map((option) => (
+                        <DropdownMenuItem
+                          key={option.value || "__none__"}
+                          className="h-9 rounded-lg px-2"
+                          onClick={() =>
+                            void handleQuickChangeAccountGroup(option.value)
+                          }
+                        >
+                          {option.label || t("未分组")}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
                   <DropdownMenuItem
                     className="h-9 rounded-lg px-2"
                     disabled={!isServiceReady}
@@ -786,7 +927,7 @@ export function AccountsPageView(props: AccountsPageViewProps) {
                 </TableHead>
                 <TableHead className="w-[132px]">{t("顺序")}</TableHead>
                 <TableHead className="w-[112px]">{t("状态")}</TableHead>
-                <TableHead className="table-sticky-action-head w-[112px] text-center">
+                <TableHead className="table-sticky-action-head w-[148px] text-center">
                   {t("操作")}
                 </TableHead>
               </TableRow>
@@ -831,6 +972,7 @@ export function AccountsPageView(props: AccountsPageViewProps) {
               ) : (
                 visibleAccounts.map((account) => {
                   const quotaItems = buildQuotaSummaryItems(account, t);
+                  const quotaEstimate = accountQuotaEstimates.get(account.id);
                   const statusAction = getAccountStatusAction(account, t);
                   const StatusActionIcon = statusAction.icon;
                   const modelPoolText = account.modelSlugs.length
@@ -905,6 +1047,22 @@ export function AccountsPageView(props: AccountsPageViewProps) {
                               {t("未设置账号容量覆盖")}
                             </span>
                           )}
+                          <span
+                            className="max-w-full rounded-full border border-border/50 bg-background/40 px-2 py-0.5 break-words [overflow-wrap:anywhere]"
+                            title={formatQuotaEstimateTitle(quotaEstimate, t)}
+                          >
+                            {t("剩余额度金额")}: {t("5小时")}{" "}
+                            {formatQuotaEstimateAmount(
+                              quotaEstimate?.primary,
+                              t,
+                            )}
+                            {" / "}
+                            {t("7天")}{" "}
+                            {formatQuotaEstimateAmount(
+                              quotaEstimate?.secondary,
+                              t,
+                            )}
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -944,20 +1102,6 @@ export function AccountsPageView(props: AccountsPageViewProps) {
                           >
                             <ArrowDown className="h-3.5 w-3.5" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground transition-colors hover:text-primary"
-                            disabled={
-                              !isServiceReady ||
-                              isReorderingAccounts ||
-                              isUpdatingProfileAccountId === account.id
-                            }
-                            onClick={() => openAccountEditor(account)}
-                            title={t("编辑账号信息")}
-                          >
-                            <PencilLine className="h-3.5 w-3.5" />
-                          </Button>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -975,6 +1119,20 @@ export function AccountsPageView(props: AccountsPageViewProps) {
                             aria-label={t("用量详情")}
                           >
                             <BarChart3 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground transition-colors hover:text-primary"
+                            disabled={
+                              !isServiceReady ||
+                              isUpdatingProfileAccountId === account.id
+                            }
+                            onClick={() => openAccountEditor(account)}
+                            title={t("编辑账号信息")}
+                            aria-label={t("编辑账号信息")}
+                          >
+                            <PencilLine className="h-4 w-4" />
                           </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger>
@@ -1028,6 +1186,17 @@ export function AccountsPageView(props: AccountsPageViewProps) {
                                 <DropdownMenuShortcut>RT</DropdownMenuShortcut>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="gap-2"
+                                disabled={
+                                  !isServiceReady ||
+                                  isUpdatingProfileAccountId === account.id
+                                }
+                                onClick={() => openAccountEditor(account)}
+                              >
+                                <PencilLine className="h-4 w-4" />
+                                {t("编辑账号信息")}
+                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="gap-2"
                                 disabled={!isServiceReady || isUpdatingPreferred}
@@ -1192,7 +1361,7 @@ export function AccountsPageView(props: AccountsPageViewProps) {
             <DialogTitle>{t("编辑账号信息")}</DialogTitle>
             <DialogDescription>
               {accountEditorState
-                ? `${t("修改")} ${accountEditorState.accountName} ${t("的名称、标签、备注、排序与额度池配置。")}`
+                ? `${t("修改")} ${accountEditorState.accountName} ${t("的名称、账号组、标签、备注、排序与额度池配置。")}`
                 : t("修改账号的基础资料。")}
             </DialogDescription>
           </DialogHeader>
@@ -1207,6 +1376,50 @@ export function AccountsPageView(props: AccountsPageViewProps) {
                   onChange={(event) => setLabelDraft(event.target.value)}
                 />
               </div>
+              <div className="grid gap-2">
+                <Label>{t("账号组")}</Label>
+                <Select
+                  value={groupNameDraft || "__none__"}
+                  disabled={Boolean(isUpdatingProfileAccountId)}
+                  onValueChange={(value) =>
+                    setGroupNameDraft(
+                      String(value || "") === "__none__" ? "" : String(value || ""),
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("未分组")}>
+                      {(value) =>
+                        String(value || "") === "__none__"
+                          ? t("未分组")
+                          : String(value || "")
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="__none__">{t("未分组")}</SelectItem>
+                      {accountGroups
+                        .filter(
+                          (group) =>
+                            group.status !== "disabled" ||
+                            group.name === groupNameDraft,
+                        )
+                        .map((group) => (
+                          <SelectItem key={group.name} value={group.name}>
+                            {group.name}
+                          </SelectItem>
+                        ))}
+                      {groupNameDraft &&
+                      !accountGroups.some((group) => group.name === groupNameDraft) ? (
+                        <SelectItem value={groupNameDraft}>{groupNameDraft}</SelectItem>
+                      ) : null}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="account-tags-input">
                   {t("标签（逗号分隔）")}

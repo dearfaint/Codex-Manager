@@ -1,5 +1,5 @@
 use super::{api_key_summaries_for_ids_chunk_sql, api_keys_for_ids_chunk_sql, ApiKey, Storage};
-use crate::storage::ApiKeyOwner;
+use crate::storage::{Account, AccountGroup, ApiKeyOwner};
 
 /// 函数 `make_test_api_key`
 ///
@@ -22,6 +22,7 @@ fn make_test_api_key(index: usize) -> ApiKey {
         rotation_strategy: "account_rotation".to_string(),
         aggregate_api_id: None,
         account_plan_filter: None,
+        account_group_filter: None,
         aggregate_api_url: None,
         client_type: "codex".to_string(),
         protocol_type: "openai_compat".to_string(),
@@ -33,6 +34,57 @@ fn make_test_api_key(index: usize) -> ApiKey {
         created_at: index as i64,
         last_used_at: Some(index as i64),
     }
+}
+
+#[test]
+fn account_group_rename_updates_accounts_and_api_key_filters() {
+    let storage = Storage::open_in_memory().expect("open");
+    storage.init().expect("init");
+    let now = crate::storage::now_ts();
+    storage
+        .insert_account(&Account {
+            id: "acc-grouped".to_string(),
+            label: "Grouped".to_string(),
+            issuer: "issuer".to_string(),
+            chatgpt_account_id: None,
+            workspace_id: None,
+            group_name: Some("old-group".to_string()),
+            sort: 0,
+            status: "active".to_string(),
+            created_at: now,
+            updated_at: now,
+        })
+        .expect("insert account");
+    let mut key = make_test_api_key(1);
+    key.account_group_filter = Some("old-group".to_string());
+    storage.insert_api_key(&key).expect("insert api key");
+
+    storage
+        .upsert_account_group(
+            Some("old-group"),
+            &AccountGroup {
+                name: "new-group".to_string(),
+                description: Some("renamed".to_string()),
+                status: "active".to_string(),
+                sort: 5,
+                created_at: now,
+                updated_at: now,
+            },
+        )
+        .expect("rename account group");
+
+    let account = storage
+        .list_accounts()
+        .expect("list accounts")
+        .into_iter()
+        .find(|item| item.id == "acc-grouped")
+        .expect("account exists");
+    let api_key = storage
+        .find_api_key_by_id(&key.id)
+        .expect("find api key")
+        .expect("api key exists");
+    assert_eq!(account.group_name.as_deref(), Some("new-group"));
+    assert_eq!(api_key.account_group_filter.as_deref(), Some("new-group"));
 }
 
 fn seed_app_user(storage: &Storage, user_id: &str) {

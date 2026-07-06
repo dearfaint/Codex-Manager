@@ -16,6 +16,7 @@ const API_KEY_SELECT_SQL: &str = "SELECT
     COALESCE(k.rotation_strategy, 'account_rotation') AS rotation_strategy,
     k.aggregate_api_id,
     k.account_plan_filter,
+    k.account_group_filter,
     a.url AS aggregate_api_url,
     COALESCE(p.client_type, 'codex') AS client_type,
     COALESCE(p.protocol_type, 'openai_compat') AS protocol_type,
@@ -39,6 +40,7 @@ const API_KEY_SUMMARY_SELECT_SQL: &str = "SELECT
     COALESCE(k.rotation_strategy, 'account_rotation') AS rotation_strategy,
     k.aggregate_api_id,
     k.account_plan_filter,
+    k.account_group_filter,
     a.url AS aggregate_api_url,
     COALESCE(p.client_type, 'codex') AS client_type,
     COALESCE(p.protocol_type, 'openai_compat') AS protocol_type,
@@ -93,7 +95,7 @@ impl Storage {
     /// 返回函数执行结果
     pub fn insert_api_key(&self, key: &ApiKey) -> Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO api_keys (id, name, model_slug, reasoning_effort, key_hash, status, created_at, last_used_at, rotation_strategy, aggregate_api_id, account_plan_filter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            "INSERT OR REPLACE INTO api_keys (id, name, model_slug, reasoning_effort, key_hash, status, created_at, last_used_at, rotation_strategy, aggregate_api_id, account_plan_filter, account_group_filter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             (
                 &key.id,
                 &key.name,
@@ -106,6 +108,7 @@ impl Storage {
                 &key.rotation_strategy,
                 &key.aggregate_api_id,
                 &key.account_plan_filter,
+                &key.account_group_filter,
             ),
         )?;
         self.conn.execute(
@@ -402,6 +405,7 @@ impl Storage {
         rotation_strategy: &str,
         aggregate_api_id: Option<&str>,
         account_plan_filter: Option<&str>,
+        account_group_filter: Option<&str>,
     ) -> Result<()> {
         self.conn.execute(
             api_key_update_rotation_config_by_id_sql(),
@@ -409,6 +413,7 @@ impl Storage {
                 rotation_strategy,
                 aggregate_api_id,
                 account_plan_filter,
+                account_group_filter,
                 key_id,
             ),
         )?;
@@ -712,6 +717,7 @@ impl Storage {
         self.ensure_column("api_keys", "rotation_strategy", "TEXT")?;
         self.ensure_column("api_keys", "aggregate_api_id", "TEXT")?;
         self.ensure_column("api_keys", "account_plan_filter", "TEXT")?;
+        self.ensure_column("api_keys", "account_group_filter", "TEXT")?;
         self.conn.execute(
             "UPDATE api_keys
              SET rotation_strategy = COALESCE(NULLIF(TRIM(rotation_strategy), ''), 'account_rotation')
@@ -722,6 +728,12 @@ impl Storage {
             "UPDATE api_keys
              SET account_plan_filter = NULL
              WHERE account_plan_filter IS NOT NULL AND TRIM(account_plan_filter) = ''",
+            [],
+        )?;
+        self.conn.execute(
+            "UPDATE api_keys
+             SET account_group_filter = NULL
+             WHERE account_group_filter IS NOT NULL AND TRIM(account_group_filter) = ''",
             [],
         )?;
         Ok(())
@@ -943,7 +955,7 @@ fn api_key_update_status_by_id_sql() -> &'static str {
 }
 
 fn api_key_update_rotation_config_by_id_sql() -> &'static str {
-    "UPDATE api_keys SET rotation_strategy = ?1, aggregate_api_id = ?2, account_plan_filter = ?3 WHERE id = ?4"
+    "UPDATE api_keys SET rotation_strategy = ?1, aggregate_api_id = ?2, account_plan_filter = ?3, account_group_filter = ?4 WHERE id = ?5"
 }
 
 fn api_key_update_name_by_id_sql() -> &'static str {
@@ -1031,16 +1043,17 @@ fn map_api_key_row(row: &Row<'_>) -> Result<ApiKey> {
         rotation_strategy: row.get(5)?,
         aggregate_api_id: row.get(6)?,
         account_plan_filter: row.get(7)?,
-        aggregate_api_url: row.get(8)?,
-        client_type: row.get(9)?,
-        protocol_type: row.get(10)?,
-        auth_scheme: row.get(11)?,
-        upstream_base_url: row.get(12)?,
-        static_headers_json: row.get(13)?,
-        key_hash: row.get(14)?,
-        status: row.get(15)?,
-        created_at: row.get(16)?,
-        last_used_at: row.get(17)?,
+        account_group_filter: row.get(8)?,
+        aggregate_api_url: row.get(9)?,
+        client_type: row.get(10)?,
+        protocol_type: row.get(11)?,
+        auth_scheme: row.get(12)?,
+        upstream_base_url: row.get(13)?,
+        static_headers_json: row.get(14)?,
+        key_hash: row.get(15)?,
+        status: row.get(16)?,
+        created_at: row.get(17)?,
+        last_used_at: row.get(18)?,
     })
 }
 
@@ -1054,16 +1067,17 @@ fn map_api_key_summary_row(row: &Row<'_>) -> Result<ApiKeyListSummary> {
         rotation_strategy: row.get(5)?,
         aggregate_api_id: row.get(6)?,
         account_plan_filter: row.get(7)?,
-        aggregate_api_url: row.get(8)?,
-        client_type: row.get(9)?,
-        protocol_type: row.get(10)?,
-        auth_scheme: row.get(11)?,
-        upstream_base_url: row.get(12)?,
-        static_headers_json: row.get(13)?,
-        status: row.get(14)?,
-        quota_limit_tokens: row.get(15)?,
-        created_at: row.get(16)?,
-        last_used_at: row.get(17)?,
+        account_group_filter: row.get(8)?,
+        aggregate_api_url: row.get(9)?,
+        client_type: row.get(10)?,
+        protocol_type: row.get(11)?,
+        auth_scheme: row.get(12)?,
+        upstream_base_url: row.get(13)?,
+        static_headers_json: row.get(14)?,
+        status: row.get(15)?,
+        quota_limit_tokens: row.get(16)?,
+        created_at: row.get(17)?,
+        last_used_at: row.get(18)?,
     })
 }
 

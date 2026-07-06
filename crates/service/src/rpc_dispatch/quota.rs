@@ -38,6 +38,9 @@ pub(super) fn try_handle(req: &JsonRpcRequest) -> Option<JsonRpcResponse> {
             super::value_or_error(read::read_quota_system_pool(reference_model))
         }
         "quota/capacityConfig" => super::value_or_error(read::read_quota_capacity_config()),
+        "quota/accountConsumption" => super::value_or_error(read::read_account_quota_consumption(
+            string_array_param(req, "accountIds"),
+        )),
         "quota/billingRules" => super::value_or_error(read::read_billing_rules()),
         "quota/billingRule/upsert" => {
             super::value_or_error(read::upsert_billing_rule(BillingRuleUpsertInput {

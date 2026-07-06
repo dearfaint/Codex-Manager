@@ -53,6 +53,17 @@ export interface AccountListResult {
   pageSize: number;
 }
 
+export interface AccountGroup {
+  name: string;
+  description: string | null;
+  status: string;
+  sort: number;
+  accountCount: number;
+  apiKeyCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface UsageAggregateSummary {
   primaryBucketCount: number;
   primaryKnownCount: number;

@@ -47,6 +47,7 @@ fn map_api_key_list_summary(key: ApiKeyListSummary) -> ApiKeySummary {
         rotation_strategy: key.rotation_strategy,
         aggregate_api_id: key.aggregate_api_id,
         account_plan_filter: key.account_plan_filter,
+        account_group_filter: key.account_group_filter,
         aggregate_api_url: key.aggregate_api_url,
         client_type: key.client_type,
         protocol_type: key.protocol_type,

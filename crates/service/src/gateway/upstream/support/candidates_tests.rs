@@ -52,6 +52,39 @@ fn upsert_account_source_model(storage: &Storage, account_id: &str, upstream_mod
         .expect("upsert account source model");
 }
 
+fn insert_active_grouped_account_with_token(
+    storage: &Storage,
+    account_id: &str,
+    group_name: &str,
+    sort: i64,
+) {
+    let now = now_ts();
+    storage
+        .insert_account(&Account {
+            id: account_id.to_string(),
+            label: account_id.to_string(),
+            issuer: "issuer".to_string(),
+            chatgpt_account_id: None,
+            workspace_id: None,
+            group_name: Some(group_name.to_string()),
+            sort,
+            status: "active".to_string(),
+            created_at: now,
+            updated_at: now,
+        })
+        .expect("insert account");
+    storage
+        .insert_token(&Token {
+            account_id: account_id.to_string(),
+            id_token: "header.payload.sig".to_string(),
+            access_token: "header.payload.sig".to_string(),
+            refresh_token: "refresh".to_string(),
+            api_key_access_token: None,
+            last_refresh: now,
+        })
+        .expect("insert token");
+}
+
 #[test]
 fn prepare_gateway_candidates_accepts_direct_upstream_model_without_platform_mapping() {
     let _guard = crate::test_env_guard();
@@ -101,12 +134,39 @@ fn prepare_gateway_candidates_accepts_direct_upstream_model_without_platform_map
         &storage,
         Some("gpt-5.4-mini"),
         None,
+        None,
         crate::gateway::LowQuotaCandidateMode::NormalOnly,
     )
     .expect("prepare candidates");
 
     assert_eq!(candidates.len(), 1);
     assert_eq!(candidates[0].0.id, "acc-direct-upstream");
+}
+
+#[test]
+fn prepare_gateway_candidates_filters_account_group() {
+    let _guard = crate::test_env_guard();
+    let storage = Storage::open_in_memory().expect("open");
+    storage.init().expect("init");
+    insert_active_grouped_account_with_token(&storage, "acc-team-a", "team-a", 0);
+    insert_active_grouped_account_with_token(&storage, "acc-team-b", "team-b", 1);
+
+    let candidates = super::prepare_gateway_candidates(
+        &storage,
+        None,
+        None,
+        Some("team-a"),
+        crate::gateway::LowQuotaCandidateMode::NormalOnly,
+    )
+    .expect("prepare candidates");
+
+    assert_eq!(
+        candidates
+            .into_iter()
+            .map(|(account, _token)| account.id)
+            .collect::<Vec<_>>(),
+        vec!["acc-team-a".to_string()]
+    );
 }
 
 #[test]
@@ -149,6 +209,7 @@ fn prepare_gateway_candidates_uses_direct_source_model_even_when_aggregate_mappi
     let candidates = super::prepare_gateway_candidates(
         &storage,
         Some("gpt-aggregate-owned"),
+        None,
         None,
         crate::gateway::LowQuotaCandidateMode::NormalOnly,
     )
@@ -202,6 +263,7 @@ fn prepare_gateway_candidates_keeps_explicit_account_mapping_with_aggregate_mapp
         &storage,
         Some("gpt-hybrid-route"),
         None,
+        None,
         crate::gateway::LowQuotaCandidateMode::NormalOnly,
     )
     .expect("prepare candidates");
@@ -247,6 +309,7 @@ fn prepare_gateway_candidates_with_account_mapping_bypasses_global_candidate_cac
         &storage,
         Some("gpt-scoped-route"),
         None,
+        None,
         crate::gateway::LowQuotaCandidateMode::NormalOnly,
     )
     .expect("prepare scoped candidates");
@@ -287,6 +350,7 @@ fn prepare_gateway_candidates_ignores_mapping_to_different_upstream_model() {
     let candidates = super::prepare_gateway_candidates(
         &storage,
         Some("gpt-5.5"),
+        None,
         None,
         crate::gateway::LowQuotaCandidateMode::NormalOnly,
     )

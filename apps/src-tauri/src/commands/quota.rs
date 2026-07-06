@@ -62,6 +62,21 @@ pub async fn service_quota_capacity_config(
 }
 
 #[tauri::command]
+pub async fn service_quota_account_consumption(
+    addr: Option<String>,
+    account_ids: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
+    rpc_call_in_background(
+        "quota/accountConsumption",
+        addr,
+        Some(serde_json::json!({
+            "accountIds": account_ids.unwrap_or_default(),
+        })),
+    )
+    .await
+}
+
+#[tauri::command]
 pub async fn service_quota_billing_rules(
     addr: Option<String>,
 ) -> Result<serde_json::Value, String> {

@@ -184,6 +184,7 @@ fn permission_denied(method: &str) -> String {
 const MEMBER_METHOD_ALLOWLIST: &[&str] = &[
     "account/chatgptAuthTokens/refresh",
     "account/chatgptAuthTokens/refreshAll",
+    "accountGroups/list",
     "account/list",
     "account/read",
     "account/update",

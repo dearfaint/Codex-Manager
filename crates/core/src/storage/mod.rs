@@ -5,6 +5,7 @@ use std::path::Path;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+mod account_groups;
 mod account_manager;
 mod account_metadata;
 mod account_subscriptions;
@@ -41,6 +42,28 @@ pub struct Account {
     pub group_name: Option<String>,
     pub sort: i64,
     pub status: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct AccountGroup {
+    pub name: String,
+    pub description: Option<String>,
+    pub status: String,
+    pub sort: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct AccountGroupSummary {
+    pub name: String,
+    pub description: Option<String>,
+    pub status: String,
+    pub sort: i64,
+    pub account_count: i64,
+    pub api_key_count: i64,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -821,6 +844,7 @@ pub struct ApiKey {
     pub rotation_strategy: String,
     pub aggregate_api_id: Option<String>,
     pub account_plan_filter: Option<String>,
+    pub account_group_filter: Option<String>,
     pub aggregate_api_url: Option<String>,
     pub client_type: String,
     pub protocol_type: String,
@@ -864,6 +888,7 @@ pub struct ApiKeyListSummary {
     pub rotation_strategy: String,
     pub aggregate_api_id: Option<String>,
     pub account_plan_filter: Option<String>,
+    pub account_group_filter: Option<String>,
     pub aggregate_api_url: Option<String>,
     pub client_type: String,
     pub protocol_type: String,
@@ -1844,7 +1869,13 @@ impl Storage {
             "111_model_source_platform_slug_lookup_indexes",
             include_str!("../../migrations/111_model_source_platform_slug_lookup_indexes.sql"),
         )?;
+        self.apply_sql_or_compat_migration(
+            "112_account_groups",
+            include_str!("../../migrations/112_account_groups.sql"),
+            |s| s.ensure_account_groups_table(),
+        )?;
         self.ensure_api_key_rotation_columns()?;
+        self.ensure_account_groups_table()?;
         self.ensure_aggregate_apis_table()?;
         self.ensure_aggregate_api_supplier_model_tables()?;
         self.ensure_aggregate_api_secrets_table()?;

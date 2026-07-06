@@ -85,6 +85,18 @@ const ROTATION_STRATEGY_LABELS: Record<string, string> = {
   hybrid_rotation: "混合轮转（账号优先）",
 };
 
+const ACCOUNT_PLAN_FILTER_LABELS: Record<string, string> = {
+  free: "Free",
+  go: "Go",
+  plus: "Plus",
+  pro: "Pro",
+  team: "Team",
+  business: "Business",
+  enterprise: "Enterprise",
+  edu: "Edu",
+  unknown: "未知计划",
+};
+
 function userCanOwnApiKey(user: AppUser): boolean {
   return user.role !== "admin";
 }
@@ -791,12 +803,35 @@ export default function ApiKeysPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="text-[10px] font-normal">
-                          {t(
-                            ROTATION_STRATEGY_LABELS[key.rotationStrategy] ||
-                              key.rotationStrategy,
-                          )}
-                        </Badge>
+                        <div className="flex flex-col items-start gap-1">
+                          <Badge variant="secondary" className="text-[10px] font-normal">
+                            {t(
+                              ROTATION_STRATEGY_LABELS[key.rotationStrategy] ||
+                                key.rotationStrategy,
+                            )}
+                          </Badge>
+                          {key.accountPlanFilter || key.accountGroupFilter ? (
+                            <div className="flex flex-wrap gap-1">
+                              {key.accountPlanFilter ? (
+                                <Badge variant="outline" className="text-[10px] font-normal">
+                                  {t("计划")}:
+                                  {" "}
+                                  {t(
+                                    ACCOUNT_PLAN_FILTER_LABELS[key.accountPlanFilter] ||
+                                      key.accountPlanFilter,
+                                  )}
+                                </Badge>
+                              ) : null}
+                              {key.accountGroupFilter ? (
+                                <Badge variant="outline" className="text-[10px] font-normal">
+                                  {t("组")}:
+                                  {" "}
+                                  {key.accountGroupFilter}
+                                </Badge>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell className="text-xs font-medium text-muted-foreground">
                         {key.model ? (

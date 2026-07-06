@@ -8,6 +8,8 @@ pub(crate) mod delete;
 pub(crate) mod delete_many;
 #[path = "account_export.rs"]
 pub(crate) mod export;
+#[path = "account_groups.rs"]
+pub(crate) mod groups;
 #[path = "account_import.rs"]
 pub(crate) mod import;
 #[path = "account_list.rs"]

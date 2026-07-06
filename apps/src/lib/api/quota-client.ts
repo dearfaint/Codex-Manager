@@ -1,5 +1,6 @@
 import { invoke, withAddr } from "@/lib/api/transport";
 import type {
+  AccountQuotaConsumptionResult,
   BillingRule,
   BillingRuleUpsertParams,
   QuotaApiKeyModelUsageItem,
@@ -266,6 +267,49 @@ function normalizeCapacityConfig(payload: unknown): QuotaCapacityConfigResult {
   };
 }
 
+function normalizeAccountConsumption(payload: unknown): AccountQuotaConsumptionResult {
+  const source = asRecord(payload);
+  return {
+    primaryWindowStartTs: toNullableNumber(
+      source.primaryWindowStartTs ?? source.primary_window_start_ts,
+    ) ?? 0,
+    secondaryWindowStartTs: toNullableNumber(
+      source.secondaryWindowStartTs ?? source.secondary_window_start_ts,
+    ) ?? 0,
+    windowEndTs: toNullableNumber(source.windowEndTs ?? source.window_end_ts) ?? 0,
+    items: asArray(source.items).map((item) => {
+      const record = asRecord(item);
+      return {
+        accountId: asString(record.accountId ?? record.account_id),
+        primaryWindowTokens: Math.max(
+          0,
+          toNullableNumber(
+            record.primaryWindowTokens ?? record.primary_window_tokens,
+          ) ?? 0,
+        ),
+        primaryWindowCostUsd: Math.max(
+          0,
+          toNullableNumber(
+            record.primaryWindowCostUsd ?? record.primary_window_cost_usd,
+          ) ?? 0,
+        ),
+        secondaryWindowTokens: Math.max(
+          0,
+          toNullableNumber(
+            record.secondaryWindowTokens ?? record.secondary_window_tokens,
+          ) ?? 0,
+        ),
+        secondaryWindowCostUsd: Math.max(
+          0,
+          toNullableNumber(
+            record.secondaryWindowCostUsd ?? record.secondary_window_cost_usd,
+          ) ?? 0,
+        ),
+      };
+    }),
+  };
+}
+
 function normalizeModelPools(payload: unknown): QuotaModelPoolsResult {
   const source = asRecord(payload);
   return {
@@ -461,6 +505,18 @@ export const quotaClient = {
   async capacityConfig(): Promise<QuotaCapacityConfigResult> {
     return normalizeCapacityConfig(
       await invoke<unknown>("service_quota_capacity_config", withAddr()),
+    );
+  },
+  async accountConsumption(accountIds: string[]): Promise<AccountQuotaConsumptionResult> {
+    return normalizeAccountConsumption(
+      await invoke<unknown>(
+        "service_quota_account_consumption",
+        withAddr({
+          accountIds: accountIds
+            .map((accountId) => String(accountId || "").trim())
+            .filter(Boolean),
+        }),
+      ),
     );
   },
   async billingRules(): Promise<BillingRule[]> {
